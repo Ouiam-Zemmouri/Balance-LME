@@ -181,6 +181,15 @@ div[data-testid="stVerticalBlockBorderWrapper"]{
 /* Dataframe */
 .stDataFrame{border-radius:12px;overflow:hidden;border:1px solid #e9edf5;}
 
+/* Gains/Losses dark cards */
+.gl-panel{background:#1c1f26;border-radius:16px;padding:22px 20px;}
+.gl-panel-title{color:#ffffff;font-size:1rem;font-weight:800;margin-bottom:16px;}
+.gl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;}
+.gl-card{background:#2a2e38;border-radius:12px;padding:18px 16px;text-align:center;}
+.gl-card-label{color:#9aa0ad;font-size:0.75rem;font-weight:500;margin-bottom:8px;}
+.gl-card-value{color:#ffffff;font-size:1.6rem;font-weight:800;line-height:1.15;}
+.gl-card-delta{font-size:0.85rem;font-weight:700;margin-top:8px;}
+
 ::-webkit-scrollbar{width:6px;height:6px;}
 ::-webkit-scrollbar-track{background:#f4f6fb;}
 ::-webkit-scrollbar-thumb{background:#c7d1e3;border-radius:6px;}
@@ -249,6 +258,16 @@ def kpi(col, icon, label, val, color=NAVY_MD, sub=None, spark=None):
       {sub_html}
       {spark_html}
       </div>""", unsafe_allow_html=True)
+
+def fmt_compact(value):
+    """Format a euro amount compactly, e.g. 1990000 -> '1.99 M', 374400 -> '374.4 K'."""
+    sign = "-" if value < 0 else ""
+    v = abs(value)
+    if v >= 1_000_000:
+        return f"{sign}{v/1_000_000:.2f} M"
+    if v >= 1_000:
+        return f"{sign}{v/1_000:.1f} K"
+    return f"{sign}{v:,.0f}"
 
 def sec(icon, title, sub=None):
     st.markdown(f'<div class="section-header">{icon}&nbsp; {title}</div>', unsafe_allow_html=True)
@@ -588,6 +607,29 @@ if len(sel_e) > 1 or len(sel_m) > 1:
         alay(figC, showlegend=True, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
              legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(figC, use_container_width=True, theme=None)
+
+# ══════════════════════ GAINS / LOSSES ══════════════════════
+gl_cards = []
+for g in groups:
+    sub_tot = view_tot[view_tot["Group"] == g]
+    g_bal = sub_tot["LME_Balance_Eur"].sum()
+    g_qty = sub_tot["Qty_Sold_T"].sum()
+    g_per_t = g_bal / g_qty if g_qty else 0
+    is_gain = g_bal >= 0
+    arrow = "▲" if is_gain else "▼"
+    delta_color = "#3ddc97" if is_gain else "#ff6b6b"
+    gl_cards.append(f"""
+      <div class="gl-card">
+        <div class="gl-card-label">{g}</div>
+        <div class="gl-card-value">€{fmt_compact(g_bal)}</div>
+        <div class="gl-card-delta" style="color:{delta_color};">{arrow} €{fmt_compact(g_per_t)}/T</div>
+      </div>""")
+
+st.markdown(f"""<div class="gl-panel">
+  <div class="gl-panel-title">💹 Gains / Losses — LME Balance Result</div>
+  <div class="gl-grid">{''.join(gl_cards)}</div>
+</div>""", unsafe_allow_html=True)
+st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 # ══════════════════════ INSIGHTS ══════════════════════
 with st.container(border=True):
