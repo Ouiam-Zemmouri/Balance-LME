@@ -655,7 +655,7 @@ st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 # ══════════════════════ INSIGHTS ══════════════════════
 with st.container(border=True):
-    sec("🧠","Result Interpretation", "Auto-generated from the current selection")
+    sec("🧠","Result Interpretation")
     if len(groups) == 1:
         for line in generate_balance_insights(view_fix, view_tot):
             st.markdown(f"- {line}")
@@ -666,42 +666,6 @@ with st.container(border=True):
                 sub_tot = view_tot[view_tot["Group"] == g]
                 for line in generate_balance_insights(sub_fix, sub_tot):
                     st.markdown(f"- {line}")
-
-# ══════════════════════ FULL DATA TABLE ══════════════════════
-with st.expander("📋 Full LME Balance Table", expanded=False):
-    disp_cols = ["Entity","Month","Fixation","Qty_Sold_T","LME_Sales","Sales_Value",
-                 "Qty_Stock_T","LME_Stock","Stock_Value","Qty_Purchase_T","LME_Purchase",
-                 "Purchase_Value","Needs_Exceed_T","Last_QTY_T","LME_Final","Final_Value",
-                 "LME_Balance_Eur"]
-    disp = view[disp_cols].reset_index(drop=True)
-    disp.columns = ["Entity","Month","Fixation","Qty Sold (T)","LME Sales (€/kg)","Sales Value (€)",
-                    "Qty Stock (T)","LME Stock (€/kg)","Stock Value (€)","Qty Purchase (T)",
-                    "LME Purchase (€/kg)","Purchase Value (€)","Needs(+)/Exceed(-) (T)",
-                    "Final Qty (T)","LME Final (€/kg)","Final Value (€)","LME Balance (€)"]
-
-    qty_cols = ["Qty Sold (T)","Qty Stock (T)","Qty Purchase (T)","Needs(+)/Exceed(-) (T)","Final Qty (T)"]
-    lme_cols = ["LME Sales (€/kg)","LME Stock (€/kg)","LME Purchase (€/kg)","LME Final (€/kg)"]
-    eur_cols = ["Sales Value (€)","Stock Value (€)","Purchase Value (€)","Final Value (€)","LME Balance (€)"]
-    fmt = {c:"{:,.2f}" for c in qty_cols}
-    fmt.update({c:"{:.4f}" for c in lme_cols})
-    fmt.update({c:"€{:,.0f}" for c in eur_cols})
-
-    st.dataframe(
-        disp.style.format(fmt)
-            .set_properties(**{"background-color":"#ffffff","color":INK})
-            .map(lambda v:"color:#0d9488;font-weight:700" if isinstance(v,(int,float)) and v>0
-                 else ("color:#e11d48;font-weight:700" if isinstance(v,(int,float)) and v<0 else ""),
-                 subset=["LME Balance (€)"])
-            .map(lambda v:"font-weight:700;color:#c2703d" if str(v).strip().upper()=="TOTAL" else "",
-                 subset=["Fixation"]),
-        use_container_width=True, hide_index=True, height=380
-    )
-
-    st.download_button(
-        "⬇️ Download consolidated balance (CSV)",
-        data=view[disp_cols].to_csv(index=False).encode("utf-8"),
-        file_name="lme_balance_consolidated.csv", mime="text/csv"
-    )
 
 st.markdown(f"""<div style="text-align:center;color:#a3abbd;font-size:0.72rem;
   margin-top:40px;padding:16px;border-top:1px solid #e9edf5;">
