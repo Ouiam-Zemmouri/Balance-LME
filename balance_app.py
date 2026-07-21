@@ -191,6 +191,7 @@ WHITE   = "#ffffff"
 PALETTE = [NAVY_MD, COPPER, TEAL, GOLD, NAVY_LT, "#7c5cbf"]
 
 LAY = dict(
+    template="plotly_white",
     paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
     font=dict(color=SLATE, family="Inter", size=12),
     margin=dict(t=30, b=40, l=55, r=20),
@@ -512,13 +513,13 @@ with rowA1:
             figA1.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
             alay(figA1, showlegend=len(sel_e) > 1,
                  yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
-            st.plotly_chart(figA1, use_container_width=True)
+            st.plotly_chart(figA1, use_container_width=True, theme=None)
         else:
             figA1 = px.bar(view_tot, x="Entity", y="LME_Balance_Eur", color="Entity",
                             color_discrete_map=ENT_COLOR, text_auto=",.0f")
             figA1.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
             alay(figA1, showlegend=False, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
-            st.plotly_chart(figA1, use_container_width=True)
+            st.plotly_chart(figA1, use_container_width=True, theme=None)
             st.caption("Add more monthly files to unlock the trend view.")
 
 with rowA2:
@@ -534,7 +535,7 @@ with rowA2:
              legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
              annotations=[dict(text=f"€{tot_sales - tot_final:+,.0f}", x=0.5, y=0.5,
                                 font=dict(size=15, color=bal_color, family="Inter"), showarrow=False)])
-        st.plotly_chart(figA2, use_container_width=True)
+        st.plotly_chart(figA2, use_container_width=True, theme=None)
 
 # ══════════════════════ ROW B — FIXATION BREAKDOWN ══════════════════════
 rowB1, rowB2 = st.columns(2)
@@ -549,7 +550,7 @@ with rowB1:
         alay(figB1, showlegend=len(groups) > 1,
              yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
              legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(figB1, use_container_width=True)
+        st.plotly_chart(figB1, use_container_width=True, theme=None)
 
 with rowB2:
     with st.container(border=True):
@@ -562,7 +563,7 @@ with rowB2:
                                 orientation="h", marker_color=NAVY_LT))
         alay(figB2, barmode="group", xaxis=dict(title="Value (€)"), yaxis=dict(title=""),
              legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(figB2, use_container_width=True)
+        st.plotly_chart(figB2, use_container_width=True, theme=None)
 
 # ══════════════════════ ROW C — ENTITY x MONTH COMPARISON ══════════════════════
 if len(sel_e) > 1 or len(sel_m) > 1:
@@ -575,7 +576,7 @@ if len(sel_e) > 1 or len(sel_m) > 1:
         figC.update_traces(textfont=dict(size=10, color=INK), textposition="outside")
         alay(figC, showlegend=True, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
              legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(figC, use_container_width=True)
+        st.plotly_chart(figC, use_container_width=True, theme=None)
 
 # ══════════════════════ INSIGHTS ══════════════════════
 with st.container(border=True):
