@@ -110,17 +110,22 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;}
 
 /* KPI cards */
 .kpi-card{
-  background:#ffffff;border-radius:14px;padding:18px 20px;
-  border:1px solid #e9edf5;border-left:4px solid #1e3a6d;
+  background:#ffffff;border-radius:14px;padding:16px 18px;position:relative;overflow:hidden;
+  border:1px solid #e9edf5;
   box-shadow:0 2px 10px rgba(20,35,70,0.05);
-  height:104px;display:flex;flex-direction:column;justify-content:center;
+  height:112px;display:flex;flex-direction:column;justify-content:flex-start;
   transition:all 0.15s ease;
 }
 .kpi-card:hover{box-shadow:0 6px 20px rgba(20,35,70,0.10);transform:translateY(-1px);}
-.kpi-label{color:#8993a8;font-size:0.68rem;font-weight:700;text-transform:uppercase;
-  letter-spacing:1.3px;margin-bottom:8px;}
-.kpi-value{color:#16264a;font-size:1.55rem;font-weight:800;line-height:1.1;}
-.kpi-sub{color:#a3abbd;font-size:0.7rem;margin-top:4px;font-weight:500;}
+.kpi-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.kpi-icon{
+  width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-size:0.82rem;flex-shrink:0;
+}
+.kpi-label{color:#8993a8;font-size:0.66rem;font-weight:700;text-transform:uppercase;letter-spacing:1.1px;}
+.kpi-value{color:#16264a;font-size:1.42rem;font-weight:800;line-height:1.1;}
+.kpi-sub{color:#a3abbd;font-size:0.7rem;margin-top:3px;font-weight:500;}
+.kpi-spark{position:absolute;right:0;bottom:0;width:96px;height:34px;opacity:0.9;}
 
 /* Section headers */
 .section-header{
@@ -186,12 +191,41 @@ LAY = dict(
     hoverlabel=dict(bgcolor="#ffffff", bordercolor="#e9edf5", font=dict(color=INK, size=12)),
 )
 
-def kpi(col, label, val, color=NAVY_MD, sub=None):
+import io
+import base64
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+def sparkline_b64(values, color):
+    """Tiny transparent area-sparkline as a base64 PNG, for embedding inside a KPI card."""
+    if values is None or len(values) < 2:
+        return None
+    fig, ax = plt.subplots(figsize=(2.0, 0.5), dpi=150)
+    ax.plot(values, color=color, linewidth=2)
+    ax.fill_between(range(len(values)), values, min(values), color=color, alpha=0.12)
+    ax.axis("off")
+    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", transparent=True)
+    plt.close(fig)
+    return base64.b64encode(buf.getvalue()).decode()
+
+def kpi(col, icon, label, val, color=NAVY_MD, sub=None, spark=None):
     sub_html = f'<div class="kpi-sub">{sub}</div>' if sub else ""
-    col.markdown(f"""<div class="kpi-card" style="border-left-color:{color};">
-      <div class="kpi-label">{label}</div>
+    spark_html = ""
+    if spark:
+        b64 = sparkline_b64(spark, color)
+        if b64:
+            spark_html = f'<img class="kpi-spark" src="data:image/png;base64,{b64}"/>'
+    col.markdown(f"""<div class="kpi-card">
+      <div class="kpi-top">
+        <div class="kpi-icon" style="background:{color}1a;color:{color};">{icon}</div>
+        <div class="kpi-label">{label}</div>
+      </div>
       <div class="kpi-value">{val}</div>
       {sub_html}
+      {spark_html}
       </div>""", unsafe_allow_html=True)
 
 def sec(icon, title, sub=None):
@@ -437,12 +471,18 @@ bal_color   = TEAL if tot_balance >= 0 else ROSE
 n_fav       = (view_tot["LME_Balance_Eur"] >= 0).sum()
 n_tot       = len(view_tot)
 
+monthly = view_tot.groupby("MonthKey")[["Sales_Value","Final_Value","LME_Balance_Eur"]].sum().sort_index()
+spark_sales   = monthly["Sales_Value"].tolist()   if len(monthly) > 1 else None
+spark_final   = monthly["Final_Value"].tolist()   if len(monthly) > 1 else None
+spark_balance = monthly["LME_Balance_Eur"].tolist() if len(monthly) > 1 else None
+
 k1,k2,k3,k4,k5 = st.columns(5)
-kpi(k1,"Sales Valuation",            f"€{tot_sales:,.0f}",   NAVY_MD, "Total sold, valorized")
-kpi(k2,"Stock + Purchase Value",     f"€{tot_final:,.0f}",   NAVY_LT, "FIFO cost basis")
-kpi(k3,"Net LME Balance",            f"€{tot_balance:,.0f}", bal_color, "Favorable" if tot_balance>=0 else "Unfavorable")
-kpi(k4,"Balance per Ton",            f"€{bal_per_t:,.1f}/T", GOLD, f"on {tot_qty:,.0f} T sold")
-kpi(k5,"Favorable Periods",          f"{n_fav} / {n_tot}",   TEAL if n_fav==n_tot else ROSE, "entity × month")
+kpi(k1,"💶","Sales Valuation",        f"€{tot_sales:,.0f}",   NAVY_MD, "Total sold, valorized", spark_sales)
+kpi(k2,"📦","Stock + Purchase Value", f"€{tot_final:,.0f}",   NAVY_LT, "FIFO cost basis", spark_final)
+kpi(k3,"⚖️","Net LME Balance",        f"€{tot_balance:,.0f}", bal_color, "Favorable" if tot_balance>=0 else "Unfavorable", spark_balance)
+kpi(k4,"📏","Balance per Ton",        f"€{bal_per_t:,.1f}/T", GOLD, f"on {tot_qty:,.0f} T sold")
+kpi(k5,"✅","Favorable Periods",      f"{n_fav} / {n_tot}",   TEAL if n_fav==n_tot else ROSE, "entity × month")
+
 
 st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
