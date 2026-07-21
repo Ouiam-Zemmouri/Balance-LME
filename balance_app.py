@@ -15,11 +15,25 @@ if "authenticated" not in st.session_state:
 
 if not st.session_state.authenticated:
     st.set_page_config(page_title="Balance LME", page_icon="⚖️", layout="centered")
+    st.markdown("""
+    <style>
+    :root, .stApp{
+      --background-color:#f4f6fb !important;
+      --secondary-background-color:#ffffff !important;
+      --text-color:#16264a !important;
+      --primary-color:#1e3a6d !important;
+    }
+    .main,[data-testid="stAppViewContainer"]{background:#f4f6fb;}
+    input{color:#16264a !important;background:#ffffff !important;}
+    </style>
+    """, unsafe_allow_html=True)
     st.markdown("<br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1,1.2,1])
     with c2:
-        st.markdown("### ⚖️ Balance LME")
-        st.caption("COFICAB Kenitra · COFICAB Maroc")
+        st.markdown("""<div style="text-align:left;margin-bottom:10px;">
+          <div style="font-size:1.2rem;font-weight:800;color:#16264a;">⚖️ Balance LME</div>
+          <div style="font-size:0.8rem;color:#5b6478;margin-top:2px;">COFICAB Kenitra · COFICAB Maroc</div>
+        </div>""", unsafe_allow_html=True)
         password = st.text_input("Password", type="password")
         if st.button("Login", use_container_width=True):
             if password == PASSWORD:
@@ -33,6 +47,38 @@ st.set_page_config(page_title="Balance LME", page_icon="⚖️",
                    layout="wide", initial_sidebar_state="expanded")
 
 # ═══════════════════ LIGHT CORPORATE THEME ═══════════════════
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* Force light theme at the root — fixes native widgets (multiselect, inputs, sidebar)
+   that otherwise inherit Streamlit's dark default regardless of our custom CSS below */
+:root, .stApp{
+  --background-color:#f4f6fb !important;
+  --secondary-background-color:#ffffff !important;
+  --text-color:#16264a !important;
+  --primary-color:#1e3a6d !important;
+}
+html,body,[class*="css"]{font-family:'Inter',sans-serif;color:#16264a;}
+.main,[data-testid="stAppViewContainer"]{background:#f4f6fb;}
+[data-testid="stHeader"]{background:transparent;}
+.block-container{padding-top:1.4rem;padding-bottom:2rem;max-width:1400px;}
+
+/* Sidebar — force white background + dark text on every element inside it */
+[data-testid="stSidebar"]{background:#ffffff !important;border-right:1px solid #e6e9f2;}
+[data-testid="stSidebar"] *{color:#16264a !important;}
+[data-testid="stSidebar"] hr{border-color:#e6e9f2 !important;}
+
+/* Multiselect / select widgets — force white control + dropdown backgrounds everywhere */
+div[data-baseweb="select"] > div{background:#ffffff !important;border-color:#c7d7f2 !important;}
+div[data-baseweb="popover"]{background:#ffffff !important;}
+ul[role="listbox"]{background:#ffffff !important;}
+li[role="option"]{background:#ffffff !important;color:#16264a !important;}
+li[role="option"]:hover{background:#eaf0fb !important;}
+input{color:#16264a !important;}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -315,8 +361,10 @@ def generate_balance_insights(view_fix, view_tot):
     return insights
 # ── SIDEBAR ──
 with st.sidebar:
-    st.markdown("### ⚖️ Balance LME")
-    st.caption("COFICAB Kenitra · COFICAB Maroc")
+    st.markdown("""<div style="padding:4px 0 10px 0;">
+      <div style="font-size:1.05rem;font-weight:800;color:#16264a;">⚖️ Balance LME</div>
+      <div style="font-size:0.78rem;color:#5b6478;margin-top:2px;">COFICAB Kenitra · COFICAB Maroc</div>
+    </div>""", unsafe_allow_html=True)
     if st.button("🔄 Refresh Data", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
