@@ -631,6 +631,28 @@ st.markdown(f"""<div class="gl-panel">
 </div>""", unsafe_allow_html=True)
 st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
+fix_gl_cards = []
+fix_agg = view_fix.groupby("Fixation")[["LME_Balance_Eur","Qty_Sold_T"]].sum().reset_index()
+for _, row in fix_agg.iterrows():
+    f_bal = row["LME_Balance_Eur"]
+    f_qty = row["Qty_Sold_T"]
+    f_per_t = f_bal / f_qty if f_qty else 0
+    is_gain = f_bal >= 0
+    arrow = "▲" if is_gain else "▼"
+    delta_color = "#3ddc97" if is_gain else "#ff6b6b"
+    fix_gl_cards.append(f"""
+      <div class="gl-card">
+        <div class="gl-card-label">{row['Fixation']}</div>
+        <div class="gl-card-value">€{fmt_compact(f_bal)}</div>
+        <div class="gl-card-delta" style="color:{delta_color};">{arrow} €{fmt_compact(f_per_t)}/T</div>
+      </div>""")
+
+st.markdown(f"""<div class="gl-panel">
+  <div class="gl-panel-title">💹 Gains / Losses — by Fixation</div>
+  <div class="gl-grid">{''.join(fix_gl_cards)}</div>
+</div>""", unsafe_allow_html=True)
+st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
 # ══════════════════════ INSIGHTS ══════════════════════
 with st.container(border=True):
     sec("🧠","Result Interpretation", "Auto-generated from the current selection")
