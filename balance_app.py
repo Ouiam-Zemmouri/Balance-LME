@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 import glob
 import os
 import re
@@ -257,13 +258,20 @@ def generate_balance_insights(view_fix, view_tot):
         )
     return insights
 
+# ── PALETTE (consistent per-entity colors across all charts) ──
+PALETTE = [COPPER, TEAL, GOLD, "#5b8dd9", "#b07d52", "#9b7bd9"]
+
+def entity_color_map(entities):
+    return {e: PALETTE[i % len(PALETTE)] for i, e in enumerate(entities)}
+
 # ── SIDEBAR ──
 with st.sidebar:
     st.markdown("### ⚖️ Balance LME")
     st.caption("COFICAB Kenitra · COFICAB Maroc")
-    if st.button("🔄 Refresh Data"):
+    if st.button("🔄 Refresh Data", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+    st.markdown("---")
 
 # ── TITLE ──
 st.markdown("""<div class="title-banner">
@@ -283,17 +291,24 @@ if bal_all.empty:
     )
     st.stop()
 
-# ── FILTERS ──
-fc1, fc2 = st.columns(2)
-ent_opts = sorted(bal_all["Entity"].unique())
-month_map = bal_all[["MonthKey","Month"]].drop_duplicates().sort_values("MonthKey")
-with fc1:
+bal_all["Group"] = bal_all["Entity"] + " · " + bal_all["Month"]
+ENT_COLOR = entity_color_map(sorted(bal_all["Entity"].unique()))
+
+# ── FILTERS (sidebar) ──
+with st.sidebar:
     st.markdown('<p class="filter-label">Entity</p>', unsafe_allow_html=True)
+    ent_opts = sorted(bal_all["Entity"].unique())
     sel_e = st.multiselect("", ent_opts, default=ent_opts, key="bal_ent", label_visibility="collapsed")
-with fc2:
+
     st.markdown('<p class="filter-label">Month</p>', unsafe_allow_html=True)
+    month_map = bal_all[["MonthKey","Month"]].drop_duplicates().sort_values("MonthKey")
     sel_m = st.multiselect("", month_map["Month"].tolist(), default=month_map["Month"].tolist(),
                             key="bal_month", label_visibility="collapsed")
+
+    st.markdown("---")
+    st.caption(f"📁 {bal_all['SourceFile'].nunique()} file(s) loaded")
+    st.caption(f"🏭 {bal_all['Entity'].nunique()} entit{'y' if bal_all['Entity'].nunique()==1 else 'ies'} · "
+               f"{bal_all['MonthKey'].nunique()} month(s)")
 
 view = bal_all[bal_all["Entity"].isin(sel_e) & bal_all["Month"].isin(sel_m)].copy()
 view_fix = view[view["Fixation"].str.upper() != "TOTAL"].copy()
@@ -303,96 +318,175 @@ if view.empty:
     st.warning("⚠️ No data matches the selected Entity / Month filters.")
     st.stop()
 
-# ── KPIs ──
+groups = sorted(view["Group"].unique())
+month_order = month_map[month_map["Month"].isin(sel_m)]["Month"].tolist()
+
+# ══════════════════════ KPI ROW ══════════════════════
 tot_sales   = view_tot["Sales_Value"].sum()
 tot_final   = view_tot["Final_Value"].sum()
 tot_balance = view_tot["LME_Balance_Eur"].sum()
 tot_qty     = view_tot["Qty_Sold_T"].sum()
+bal_per_t   = tot_balance / tot_qty if tot_qty else 0
 bal_color   = TEAL if tot_balance >= 0 else "#f43f5e"
+n_fav       = (view_tot["LME_Balance_Eur"] >= 0).sum()
+n_tot       = len(view_tot)
 
-sec("📊","Purchase & Balance KPIs")
-k1,k2,k3,k4 = st.columns(4)
+sec("📊","Key Indicators")
+k1,k2,k3,k4,k5 = st.columns(5)
 kpi(k1,"Sales Valuation (€)",            f"{tot_sales:,.0f}",  COPPER)
 kpi(k2,"Stock + Purchase Valuation (€)", f"{tot_final:,.0f}",  NAVY_LT)
 kpi(k3,"Net LME Balance (€)",            f"{tot_balance:,.0f}",bal_color)
-kpi(k4,"Total Qty Sold (T)",             f"{tot_qty:,.1f}",    GOLD)
+kpi(k4,"Balance per Ton (€/T)",          f"{bal_per_t:,.1f}",  GOLD)
+kpi(k5,"Favorable Periods",              f"{n_fav} / {n_tot}", TEAL if n_fav==n_tot else "#f43f5e")
 
-# ── CHART 1 : Balance by fixation ──
-sec("📈","LME Balance (€) by Fixation")
-fig1 = go.Figure(go.Bar(
-    x=view_fix["Fixation"], y=view_fix["LME_Balance_Eur"],
-    marker=dict(color=[TEAL if v>=0 else "#f43f5e" for v in view_fix["LME_Balance_Eur"]]),
-    text=[f"{v:,.0f}" for v in view_fix["LME_Balance_Eur"]],
-    textposition="outside", textfont=dict(size=11,color=ICE)))
-alay(fig1, title="LME Balance (€) by Fixation — positive = favorable to COFICAB",
-     yaxis=dict(title="LME Balance (€)", gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color=SLATE)))
-st.plotly_chart(fig1, use_container_width=True)
+st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
-# ── CHART 2 : Sales vs Stock+Purchase valuation ──
-sec("💰","Sales vs Stock+Purchase Valuation")
-fig2 = go.Figure()
-fig2.add_trace(go.Bar(name="Sales Value", x=view_fix["Fixation"], y=view_fix["Sales_Value"], marker_color=COPPER))
-fig2.add_trace(go.Bar(name="Stock+Purchase Value", x=view_fix["Fixation"], y=view_fix["Final_Value"], marker_color=NAVY_LT))
-alay(fig2, barmode="group", title="Sales vs Stock+Purchase Valuation (€) by Fixation",
-     yaxis=dict(title="Value (€)", gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color=SLATE)),
-     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color=ICE, size=11)))
-st.plotly_chart(fig2, use_container_width=True)
+# ══════════════════════ ROW A — TREND + SPLIT ══════════════════════
+rowA1, rowA2 = st.columns([2,1])
 
-# ── CHART 3 : Trend across months ──
-if bal_all["MonthKey"].nunique() > 1:
-    sec("📅","Net LME Balance — Monthly Trend")
-    trend = (view_tot.groupby(["MonthKey","Month"])["LME_Balance_Eur"]
-             .sum().reset_index().sort_values("MonthKey"))
-    fig3 = go.Figure(go.Scatter(
-        x=trend["Month"], y=trend["LME_Balance_Eur"],
-        mode="lines+markers+text", line=dict(color=GOLD, width=3),
-        marker=dict(size=10, color=GOLD, line=dict(width=2, color="rgba(255,255,255,0.25)")),
-        text=[f"{v:,.0f}" for v in trend["LME_Balance_Eur"]],
-        textposition="top center", textfont=dict(size=10, color=GOLD)))
-    alay(fig3, title="Net LME Balance (€) — Monthly Trend",
-         yaxis=dict(title="LME Balance (€)", gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color=SLATE)))
-    st.plotly_chart(fig3, use_container_width=True)
+with rowA1:
+    with st.container(border=True):
+        sec("📅","Net LME Balance — Trend")
+        trend = (view_tot.groupby(["Entity","MonthKey","Month"])["LME_Balance_Eur"]
+                 .sum().reset_index().sort_values("MonthKey"))
+        if trend["MonthKey"].nunique() > 1:
+            figA1 = px.line(trend, x="Month", y="LME_Balance_Eur", color="Entity",
+                             markers=True, category_orders={"Month": month_order},
+                             color_discrete_map=ENT_COLOR)
+            figA1.update_traces(line=dict(width=3), marker=dict(size=9))
+            figA1.add_hline(y=0, line_dash="dot", line_color="rgba(255,255,255,0.2)")
+            alay(figA1, showlegend=len(sel_e) > 1,
+                 yaxis=dict(title="LME Balance (€)", gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color=SLATE)),
+                 xaxis=dict(title="", tickfont=dict(color=SLATE)))
+            st.plotly_chart(figA1, use_container_width=True)
+        else:
+            figA1 = px.bar(view_tot, x="Entity", y="LME_Balance_Eur", color="Entity",
+                            color_discrete_map=ENT_COLOR, text_auto=",.0f")
+            figA1.add_hline(y=0, line_dash="dot", line_color="rgba(255,255,255,0.2)")
+            alay(figA1, showlegend=False,
+                 yaxis=dict(title="LME Balance (€)", gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color=SLATE)),
+                 xaxis=dict(title="", tickfont=dict(color=SLATE)))
+            st.plotly_chart(figA1, use_container_width=True)
+            st.caption("Add more monthly files to unlock the trend view.")
 
-# ── RESULT INTERPRETATION ──
-sec("🧠","Result Interpretation")
-for line in generate_balance_insights(view_fix, view_tot):
-    st.markdown(f"- {line}")
+with rowA2:
+    with st.container(border=True):
+        sec("🥯","Valuation Split")
+        donut_df = pd.DataFrame({
+            "Component": ["Sales", "Stock + Purchase"],
+            "Value": [tot_sales, tot_final]
+        })
+        figA2 = go.Figure(go.Pie(
+            labels=donut_df["Component"], values=donut_df["Value"], hole=0.62,
+            marker=dict(colors=[COPPER, NAVY_LT], line=dict(color=NAVY, width=2)),
+            textinfo="percent", textfont=dict(color=WHITE, size=12)
+        ))
+        alay(figA2, showlegend=True,
+             legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5,
+                         font=dict(color=ICE, size=11)),
+             annotations=[dict(text=f"€{tot_sales - tot_final:+,.0f}", x=0.5, y=0.5,
+                                font=dict(size=15, color=bal_color, family="Inter"), showarrow=False)])
+        st.plotly_chart(figA2, use_container_width=True)
 
-# ── FULL BALANCE TABLE ──
-sec("📋","Full LME Balance Table")
-disp_cols = ["Entity","Month","Fixation","Qty_Sold_T","LME_Sales","Sales_Value",
-             "Qty_Stock_T","LME_Stock","Stock_Value","Qty_Purchase_T","LME_Purchase",
-             "Purchase_Value","Needs_Exceed_T","Last_QTY_T","LME_Final","Final_Value",
-             "LME_Balance_Eur"]
-disp = view[disp_cols].reset_index(drop=True)
-disp.columns = ["Entity","Month","Fixation","Qty Sold (T)","LME Sales (€/kg)","Sales Value (€)",
-                "Qty Stock (T)","LME Stock (€/kg)","Stock Value (€)","Qty Purchase (T)",
-                "LME Purchase (€/kg)","Purchase Value (€)","Needs(+)/Exceed(-) (T)",
-                "Final Qty (T)","LME Final (€/kg)","Final Value (€)","LME Balance (€)"]
+# ══════════════════════ ROW B — FIXATION BREAKDOWN ══════════════════════
+rowB1, rowB2 = st.columns(2)
 
-qty_cols = ["Qty Sold (T)","Qty Stock (T)","Qty Purchase (T)","Needs(+)/Exceed(-) (T)","Final Qty (T)"]
-lme_cols = ["LME Sales (€/kg)","LME Stock (€/kg)","LME Purchase (€/kg)","LME Final (€/kg)"]
-eur_cols = ["Sales Value (€)","Stock Value (€)","Purchase Value (€)","Final Value (€)","LME Balance (€)"]
-fmt = {c:"{:,.2f}" for c in qty_cols}
-fmt.update({c:"{:.4f}" for c in lme_cols})
-fmt.update({c:"€{:,.0f}" for c in eur_cols})
+with rowB1:
+    with st.container(border=True):
+        sec("📈","LME Balance by Fixation")
+        figB1 = px.bar(view_fix, x="Fixation", y="LME_Balance_Eur", color="Group",
+                        barmode="group", text_auto=",.0f",
+                        color_discrete_sequence=PALETTE)
+        figB1.add_hline(y=0, line_color="rgba(255,255,255,0.15)")
+        figB1.update_traces(textfont=dict(size=10, color=ICE), textposition="outside")
+        alay(figB1, showlegend=len(groups) > 1,
+             yaxis=dict(title="LME Balance (€)", gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color=SLATE)),
+             xaxis=dict(title="", tickfont=dict(color=SLATE)),
+             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+                         font=dict(color=ICE, size=10)))
+        st.plotly_chart(figB1, use_container_width=True)
 
-st.dataframe(
-    disp.style.format(fmt)
-        .set_properties(**{"background-color":NAVY_MD,"color":ICE})
-        .map(lambda v:"color:#10b981;font-weight:700" if isinstance(v,(int,float)) and v>0
-             else ("color:#f43f5e;font-weight:700" if isinstance(v,(int,float)) and v<0 else ""),
-             subset=["LME Balance (€)"])
-        .map(lambda v:"font-weight:700;color:#d4a97a" if str(v).strip().upper()=="TOTAL" else "",
-             subset=["Fixation"]),
-    use_container_width=True, hide_index=True, height=380
-)
+with rowB2:
+    with st.container(border=True):
+        sec("💰","Sales vs Valuation by Fixation")
+        melted = view_fix.groupby("Fixation")[["Sales_Value","Final_Value"]].sum().reset_index()
+        figB2 = go.Figure()
+        figB2.add_trace(go.Bar(name="Sales", y=melted["Fixation"], x=melted["Sales_Value"],
+                                orientation="h", marker_color=COPPER))
+        figB2.add_trace(go.Bar(name="Stock+Purchase", y=melted["Fixation"], x=melted["Final_Value"],
+                                orientation="h", marker_color=NAVY_LT))
+        alay(figB2, barmode="group",
+             xaxis=dict(title="Value (€)", gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color=SLATE)),
+             yaxis=dict(title="", tickfont=dict(color=SLATE)),
+             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+                         font=dict(color=ICE, size=10)))
+        st.plotly_chart(figB2, use_container_width=True)
 
-st.download_button(
-    "⬇️ Download consolidated balance (CSV)",
-    data=view[disp_cols].to_csv(index=False).encode("utf-8"),
-    file_name="lme_balance_consolidated.csv", mime="text/csv"
-)
+# ══════════════════════ ROW C — ENTITY x MONTH COMPARISON ══════════════════════
+if len(sel_e) > 1 or len(sel_m) > 1:
+    with st.container(border=True):
+        sec("🌍","Balance by Entity & Month")
+        figC = px.bar(view_tot, x="Month", y="LME_Balance_Eur", color="Entity",
+                      barmode="group", text_auto=",.0f",
+                      category_orders={"Month": month_order}, color_discrete_map=ENT_COLOR)
+        figC.add_hline(y=0, line_color="rgba(255,255,255,0.15)")
+        figC.update_traces(textfont=dict(size=10, color=ICE), textposition="outside")
+        alay(figC, showlegend=True,
+             yaxis=dict(title="LME Balance (€)", gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color=SLATE)),
+             xaxis=dict(title="", tickfont=dict(color=SLATE)),
+             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+                         font=dict(color=ICE, size=10)))
+        st.plotly_chart(figC, use_container_width=True)
+
+# ══════════════════════ INSIGHTS ══════════════════════
+with st.container(border=True):
+    sec("🧠","Result Interpretation")
+    if len(groups) == 1:
+        for line in generate_balance_insights(view_fix, view_tot):
+            st.markdown(f"- {line}")
+    else:
+        for g in groups:
+            with st.expander(f"📌 {g}", expanded=False):
+                sub_fix = view_fix[view_fix["Group"] == g]
+                sub_tot = view_tot[view_tot["Group"] == g]
+                for line in generate_balance_insights(sub_fix, sub_tot):
+                    st.markdown(f"- {line}")
+
+# ══════════════════════ FULL DATA TABLE ══════════════════════
+with st.expander("📋 Full LME Balance Table", expanded=False):
+    disp_cols = ["Entity","Month","Fixation","Qty_Sold_T","LME_Sales","Sales_Value",
+                 "Qty_Stock_T","LME_Stock","Stock_Value","Qty_Purchase_T","LME_Purchase",
+                 "Purchase_Value","Needs_Exceed_T","Last_QTY_T","LME_Final","Final_Value",
+                 "LME_Balance_Eur"]
+    disp = view[disp_cols].reset_index(drop=True)
+    disp.columns = ["Entity","Month","Fixation","Qty Sold (T)","LME Sales (€/kg)","Sales Value (€)",
+                    "Qty Stock (T)","LME Stock (€/kg)","Stock Value (€)","Qty Purchase (T)",
+                    "LME Purchase (€/kg)","Purchase Value (€)","Needs(+)/Exceed(-) (T)",
+                    "Final Qty (T)","LME Final (€/kg)","Final Value (€)","LME Balance (€)"]
+
+    qty_cols = ["Qty Sold (T)","Qty Stock (T)","Qty Purchase (T)","Needs(+)/Exceed(-) (T)","Final Qty (T)"]
+    lme_cols = ["LME Sales (€/kg)","LME Stock (€/kg)","LME Purchase (€/kg)","LME Final (€/kg)"]
+    eur_cols = ["Sales Value (€)","Stock Value (€)","Purchase Value (€)","Final Value (€)","LME Balance (€)"]
+    fmt = {c:"{:,.2f}" for c in qty_cols}
+    fmt.update({c:"{:.4f}" for c in lme_cols})
+    fmt.update({c:"€{:,.0f}" for c in eur_cols})
+
+    st.dataframe(
+        disp.style.format(fmt)
+            .set_properties(**{"background-color":NAVY_MD,"color":ICE})
+            .map(lambda v:"color:#10b981;font-weight:700" if isinstance(v,(int,float)) and v>0
+                 else ("color:#f43f5e;font-weight:700" if isinstance(v,(int,float)) and v<0 else ""),
+                 subset=["LME Balance (€)"])
+            .map(lambda v:"font-weight:700;color:#d4a97a" if str(v).strip().upper()=="TOTAL" else "",
+                 subset=["Fixation"]),
+        use_container_width=True, hide_index=True, height=380
+    )
+
+    st.download_button(
+        "⬇️ Download consolidated balance (CSV)",
+        data=view[disp_cols].to_csv(index=False).encode("utf-8"),
+        file_name="lme_balance_consolidated.csv", mime="text/csv"
+    )
 
 st.markdown(f"""<div style="text-align:center;color:#1a2e4a;font-size:0.72rem;
   margin-top:48px;padding:16px;border-top:1px solid rgba(139,94,60,0.12);">
