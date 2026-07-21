@@ -14,94 +14,150 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    st.title("🔒 Login Required")
-    password = st.text_input("Password", type="password")
-    if st.button("Login"):
-        if password == PASSWORD:
-            st.session_state.authenticated = True
-            st.rerun()
-        else:
-            st.error("Incorrect password")
+    st.set_page_config(page_title="Balance LME", page_icon="⚖️", layout="centered")
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([1,1.2,1])
+    with c2:
+        st.markdown("### ⚖️ Balance LME")
+        st.caption("COFICAB Kenitra · COFICAB Maroc")
+        password = st.text_input("Password", type="password")
+        if st.button("Login", use_container_width=True):
+            if password == PASSWORD:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Incorrect password")
     st.stop()
 
 st.set_page_config(page_title="Balance LME", page_icon="⚖️",
                    layout="wide", initial_sidebar_state="expanded")
 
+# ═══════════════════ LIGHT CORPORATE THEME ═══════════════════
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 html,body,[class*="css"]{font-family:'Inter',sans-serif;}
-.main,[data-testid="stAppViewContainer"]{background:#0f1b3d;}
+.main,[data-testid="stAppViewContainer"]{background:#f4f6fb;}
 [data-testid="stHeader"]{background:transparent;}
-.block-container{padding-top:1.5rem;padding-bottom:2rem;}
+.block-container{padding-top:1.4rem;padding-bottom:2rem;max-width:1400px;}
+
+/* Sidebar */
+[data-testid="stSidebar"]{background:#ffffff;border-right:1px solid #e6e9f2;}
+[data-testid="stSidebar"] .stCaption{color:#8993a8;}
+
+/* Header banner */
 .title-banner{
-  background:linear-gradient(135deg,#0f1b3d 0%,#1B2F6E 50%,#0f1b3d 100%);
-  border:1px solid rgba(139,94,60,0.3);border-top:3px solid #8B5E3C;
-  border-radius:16px;padding:30px 40px;margin-bottom:28px;text-align:center;
-  box-shadow:0 6px 60px rgba(27,47,110,0.3);
+  background:linear-gradient(120deg,#16264a 0%,#1e3a6d 100%);
+  border-radius:16px;padding:26px 36px;margin-bottom:22px;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+  box-shadow:0 8px 28px rgba(20,35,70,0.18);
 }
 .title-banner h1{
-  font-size:2rem;font-weight:800;letter-spacing:5px;margin:0;text-transform:uppercase;
-  background:linear-gradient(90deg,#FFFFFF,#d4a97a,#FFFFFF,#d4a97a,#FFFFFF);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  font-size:1.65rem;font-weight:800;letter-spacing:1px;margin:0;color:#ffffff;
 }
-.title-banner p{color:#8fa3c8;font-size:0.8rem;margin:8px 0 0 0;letter-spacing:2px;}
+.title-banner p{color:#a8c0e8;font-size:0.82rem;margin:4px 0 0 0;letter-spacing:0.5px;}
+.badge-strip{display:flex;gap:10px;flex-wrap:wrap;}
+.badge{
+  background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
+  border-radius:20px;padding:6px 16px;color:#e8eefc;font-size:0.76rem;font-weight:600;
+}
+
+/* KPI cards */
 .kpi-card{
-  background:linear-gradient(145deg,#162040,#1a2850);
-  border:1px solid rgba(255,255,255,0.06);border-left:3px solid #8B5E3C;
-  border-radius:12px;padding:18px 14px;text-align:center;
-  height:118px;display:flex;flex-direction:column;justify-content:center;
-  box-shadow:0 2px 24px rgba(0,0,0,0.5);transition:all 0.2s ease;
+  background:#ffffff;border-radius:14px;padding:18px 20px;
+  border:1px solid #e9edf5;border-left:4px solid #1e3a6d;
+  box-shadow:0 2px 10px rgba(20,35,70,0.05);
+  height:104px;display:flex;flex-direction:column;justify-content:center;
+  transition:all 0.15s ease;
 }
-.kpi-card:hover{transform:translateY(-2px);box-shadow:0 6px 32px rgba(27,47,110,0.25);}
+.kpi-card:hover{box-shadow:0 6px 20px rgba(20,35,70,0.10);transform:translateY(-1px);}
+.kpi-label{color:#8993a8;font-size:0.68rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:1.3px;margin-bottom:8px;}
+.kpi-value{color:#16264a;font-size:1.55rem;font-weight:800;line-height:1.1;}
+.kpi-sub{color:#a3abbd;font-size:0.7rem;margin-top:4px;font-weight:500;}
+
+/* Section headers */
 .section-header{
-  color:#8B5E3C;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:3px;
-  border-bottom:1px solid rgba(139,94,60,0.25);padding-bottom:8px;margin:28px 0 18px 0;
+  color:#16264a;font-size:0.92rem;font-weight:700;
+  margin:0 0 14px 0;display:flex;align-items:center;gap:8px;
 }
-[data-testid="stSidebar"]{background:#0d1530;border-right:1px solid rgba(27,47,110,0.2);}
-.filter-label{color:#8fa3c8;font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin:14px 0 3px 0;}
-[data-baseweb="tag"]{background:rgba(27,47,110,0.3) !important;border:1px solid rgba(27,47,110,0.5) !important;color:#FFFFFF !important;border-radius:6px !important;}
-::-webkit-scrollbar{width:3px;height:3px;}
-::-webkit-scrollbar-track{background:#162040;}
-::-webkit-scrollbar-thumb{background:#1B2F6E;border-radius:4px;}
-::-webkit-scrollbar-thumb:hover{background:#8B5E3C;}
-.stDataFrame{border-radius:10px;overflow:hidden;border:1px solid rgba(139,94,60,0.1);}
+.section-sub{color:#8993a8;font-size:0.76rem;margin:-10px 0 14px 0;}
+
+/* Chart / content cards */
+div[data-testid="stVerticalBlockBorderWrapper"]{
+  background:#ffffff;border-radius:14px;border:1px solid #e9edf5 !important;
+  box-shadow:0 2px 10px rgba(20,35,70,0.04);
+}
+
+/* Filter pills (multiselect) */
+[data-baseweb="tag"]{
+  background:#eaf0fb !important;border:1px solid #c7d7f2 !important;
+  color:#1e3a6d !important;border-radius:8px !important;font-weight:600 !important;
+}
+.filter-label{color:#5b6478;font-size:0.68rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:1.5px;margin:14px 0 4px 0;}
+
+/* Buttons */
+.stButton>button{
+  background:#1e3a6d;color:#ffffff;border-radius:9px;border:none;font-weight:600;
+}
+.stButton>button:hover{background:#16264a;color:#ffffff;}
+
+/* Expander */
+.streamlit-expanderHeader{background:#ffffff;border-radius:10px;font-weight:600;color:#16264a;}
+
+/* Dataframe */
+.stDataFrame{border-radius:12px;overflow:hidden;border:1px solid #e9edf5;}
+
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:#f4f6fb;}
+::-webkit-scrollbar-thumb{background:#c7d1e3;border-radius:6px;}
 </style>
 """, unsafe_allow_html=True)
 
-# ── COLORS ──
-NAVY    = "#0f1b3d"; NAVY_MD = "#162040"; NAVY_LT = "#1B2F6E"
-COPPER  = "#8B5E3C"; COP_LT  = "#b07d52"; COP_XL  = "#d4a97a"
-WHITE   = "#FFFFFF"; ICE     = "#c8d5ea"; SLATE   = "#8fa3c8"
-TEAL    = "#0ea5a0"; GOLD    = "#c49040"
+# ── PALETTE (light theme, corporate) ──
+NAVY    = "#16264a"   # deep navy — headers, primary text
+NAVY_MD = "#1e3a6d"   # medium navy — primary accent / bars
+NAVY_LT = "#3d6fc4"   # lighter blue — secondary series
+COPPER  = "#c2703d"   # brand copper — COFICAB accent
+GOLD    = "#c9932e"   # amber accent
+TEAL    = "#0d9488"   # favorable / positive
+ROSE    = "#e11d48"   # unfavorable / negative
+SLATE   = "#5b6478"   # muted axis / caption text
+INK     = "#16264a"   # dark text on white
+WHITE   = "#ffffff"
+
+PALETTE = [NAVY_MD, COPPER, TEAL, GOLD, NAVY_LT, "#7c5cbf"]
 
 LAY = dict(
-    paper_bgcolor=NAVY, plot_bgcolor="#0d1730",
+    paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
     font=dict(color=SLATE, family="Inter", size=12),
-    margin=dict(t=55, b=45, l=60, r=25),
-    legend=dict(bgcolor="rgba(15,27,61,0.97)", bordercolor="rgba(139,94,60,0.25)",
-                borderwidth=1, font=dict(color=ICE, size=11)),
-    xaxis=dict(gridcolor="rgba(255,255,255,0.04)", zeroline=False,
-               tickfont=dict(color=SLATE, size=11)),
-    yaxis=dict(gridcolor="rgba(255,255,255,0.04)", zeroline=False,
-               tickfont=dict(color=SLATE, size=11)),
-    title_font=dict(color=COP_LT, size=13, family="Inter"),
-    hoverlabel=dict(bgcolor=NAVY_MD, bordercolor="rgba(139,94,60,0.4)",
-                    font=dict(color=WHITE, size=12)),
+    margin=dict(t=30, b=40, l=55, r=20),
+    legend=dict(bgcolor="rgba(255,255,255,0.95)", bordercolor="#e9edf5",
+                borderwidth=1, font=dict(color=INK, size=11)),
+    xaxis=dict(gridcolor="#f0f2f8", zeroline=False, tickfont=dict(color=SLATE, size=11)),
+    yaxis=dict(gridcolor="#f0f2f8", zeroline=False, tickfont=dict(color=SLATE, size=11)),
+    hoverlabel=dict(bgcolor="#ffffff", bordercolor="#e9edf5", font=dict(color=INK, size=12)),
 )
 
-def kpi(col, label, val, color=COPPER):
+def kpi(col, label, val, color=NAVY_MD, sub=None):
+    sub_html = f'<div class="kpi-sub">{sub}</div>' if sub else ""
     col.markdown(f"""<div class="kpi-card" style="border-left-color:{color};">
-      <div style="color:{WHITE};font-size:0.68rem;font-weight:700;text-transform:uppercase;
-                  letter-spacing:1.8px;margin-bottom:10px;">{label}</div>
-      <div style="color:{WHITE};font-size:1.55rem;font-weight:800;line-height:1.1;">{val}</div>
+      <div class="kpi-label">{label}</div>
+      <div class="kpi-value">{val}</div>
+      {sub_html}
       </div>""", unsafe_allow_html=True)
 
-def sec(icon, title):
+def sec(icon, title, sub=None):
     st.markdown(f'<div class="section-header">{icon}&nbsp; {title}</div>', unsafe_allow_html=True)
+    if sub:
+        st.markdown(f'<div class="section-sub">{sub}</div>', unsafe_allow_html=True)
 
 def alay(fig, **kw):
     fig.update_layout(**{**LAY, **kw}); return fig
+
+def entity_color_map(entities):
+    return {e: PALETTE[i % len(PALETTE)] for i, e in enumerate(entities)}
 
 # ── LME BALANCE — PARSING ──
 ENTITY_CODE_MAP = {
@@ -257,13 +313,6 @@ def generate_balance_insights(view_fix, view_tot):
             f"**{sign} of €{abs(top_c['LME_Balance_Eur']):,.0f}**."
         )
     return insights
-
-# ── PALETTE (consistent per-entity colors across all charts) ──
-PALETTE = [COPPER, TEAL, GOLD, "#5b8dd9", "#b07d52", "#9b7bd9"]
-
-def entity_color_map(entities):
-    return {e: PALETTE[i % len(PALETTE)] for i, e in enumerate(entities)}
-
 # ── SIDEBAR ──
 with st.sidebar:
     st.markdown("### ⚖️ Balance LME")
@@ -273,17 +322,14 @@ with st.sidebar:
         st.rerun()
     st.markdown("---")
 
-# ── TITLE ──
-st.markdown("""<div class="title-banner">
-  <h1>Balance LME</h1>
-  <p>FIFO Method · Sales vs Stock &amp; Purchase Valuation</p>
-</div>""", unsafe_allow_html=True)
-
 bal_all, errors = load_all_balance_files()
 for e in errors:
     st.warning(e)
 
 if bal_all.empty:
+    st.markdown("""<div class="title-banner">
+      <div><h1>⚖️ Balance LME</h1><p>FIFO Method · Sales vs Stock &amp; Purchase Valuation</p></div>
+    </div>""", unsafe_allow_html=True)
     st.info(
         f"No balance files found yet. Add your monthly `.xlsx` files "
         f"(e.g. `COF_KT_-_LME_balance_06_2026.xlsx`) to the **`{BALANCE_FOLDER}/`** "
@@ -314,6 +360,18 @@ view = bal_all[bal_all["Entity"].isin(sel_e) & bal_all["Month"].isin(sel_m)].cop
 view_fix = view[view["Fixation"].str.upper() != "TOTAL"].copy()
 view_tot = view[view["Fixation"].str.upper() == "TOTAL"].copy()
 
+# ── HEADER BANNER ──
+st.markdown(f"""<div class="title-banner">
+  <div>
+    <h1>⚖️ Balance LME</h1>
+    <p>FIFO Method · Sales vs Stock &amp; Purchase Valuation</p>
+  </div>
+  <div class="badge-strip">
+    <div class="badge">🏭 {', '.join(sel_e) if len(sel_e)<=2 else f'{len(sel_e)} entities'}</div>
+    <div class="badge">📅 {', '.join(sel_m) if len(sel_m)<=3 else f'{len(sel_m)} months'}</div>
+  </div>
+</div>""", unsafe_allow_html=True)
+
 if view.empty:
     st.warning("⚠️ No data matches the selected Entity / Month filters.")
     st.stop()
@@ -327,26 +385,25 @@ tot_final   = view_tot["Final_Value"].sum()
 tot_balance = view_tot["LME_Balance_Eur"].sum()
 tot_qty     = view_tot["Qty_Sold_T"].sum()
 bal_per_t   = tot_balance / tot_qty if tot_qty else 0
-bal_color   = TEAL if tot_balance >= 0 else "#f43f5e"
+bal_color   = TEAL if tot_balance >= 0 else ROSE
 n_fav       = (view_tot["LME_Balance_Eur"] >= 0).sum()
 n_tot       = len(view_tot)
 
-sec("📊","Key Indicators")
 k1,k2,k3,k4,k5 = st.columns(5)
-kpi(k1,"Sales Valuation (€)",            f"{tot_sales:,.0f}",  COPPER)
-kpi(k2,"Stock + Purchase Valuation (€)", f"{tot_final:,.0f}",  NAVY_LT)
-kpi(k3,"Net LME Balance (€)",            f"{tot_balance:,.0f}",bal_color)
-kpi(k4,"Balance per Ton (€/T)",          f"{bal_per_t:,.1f}",  GOLD)
-kpi(k5,"Favorable Periods",              f"{n_fav} / {n_tot}", TEAL if n_fav==n_tot else "#f43f5e")
+kpi(k1,"Sales Valuation",            f"€{tot_sales:,.0f}",   NAVY_MD, "Total sold, valorized")
+kpi(k2,"Stock + Purchase Value",     f"€{tot_final:,.0f}",   NAVY_LT, "FIFO cost basis")
+kpi(k3,"Net LME Balance",            f"€{tot_balance:,.0f}", bal_color, "Favorable" if tot_balance>=0 else "Unfavorable")
+kpi(k4,"Balance per Ton",            f"€{bal_per_t:,.1f}/T", GOLD, f"on {tot_qty:,.0f} T sold")
+kpi(k5,"Favorable Periods",          f"{n_fav} / {n_tot}",   TEAL if n_fav==n_tot else ROSE, "entity × month")
 
-st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
 # ══════════════════════ ROW A — TREND + SPLIT ══════════════════════
 rowA1, rowA2 = st.columns([2,1])
 
 with rowA1:
     with st.container(border=True):
-        sec("📅","Net LME Balance — Trend")
+        sec("📅","Net LME Balance — Trend", "Monthly evolution by entity")
         trend = (view_tot.groupby(["Entity","MonthKey","Month"])["LME_Balance_Eur"]
                  .sum().reset_index().sort_values("MonthKey"))
         if trend["MonthKey"].nunique() > 1:
@@ -354,36 +411,29 @@ with rowA1:
                              markers=True, category_orders={"Month": month_order},
                              color_discrete_map=ENT_COLOR)
             figA1.update_traces(line=dict(width=3), marker=dict(size=9))
-            figA1.add_hline(y=0, line_dash="dot", line_color="rgba(255,255,255,0.2)")
+            figA1.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
             alay(figA1, showlegend=len(sel_e) > 1,
-                 yaxis=dict(title="LME Balance (€)", gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color=SLATE)),
-                 xaxis=dict(title="", tickfont=dict(color=SLATE)))
+                 yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
             st.plotly_chart(figA1, use_container_width=True)
         else:
             figA1 = px.bar(view_tot, x="Entity", y="LME_Balance_Eur", color="Entity",
                             color_discrete_map=ENT_COLOR, text_auto=",.0f")
-            figA1.add_hline(y=0, line_dash="dot", line_color="rgba(255,255,255,0.2)")
-            alay(figA1, showlegend=False,
-                 yaxis=dict(title="LME Balance (€)", gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color=SLATE)),
-                 xaxis=dict(title="", tickfont=dict(color=SLATE)))
+            figA1.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
+            alay(figA1, showlegend=False, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
             st.plotly_chart(figA1, use_container_width=True)
             st.caption("Add more monthly files to unlock the trend view.")
 
 with rowA2:
     with st.container(border=True):
-        sec("🥯","Valuation Split")
-        donut_df = pd.DataFrame({
-            "Component": ["Sales", "Stock + Purchase"],
-            "Value": [tot_sales, tot_final]
-        })
+        sec("🥯","Valuation Split", "Sales vs cost basis")
+        donut_df = pd.DataFrame({"Component": ["Sales", "Stock + Purchase"], "Value": [tot_sales, tot_final]})
         figA2 = go.Figure(go.Pie(
             labels=donut_df["Component"], values=donut_df["Value"], hole=0.62,
-            marker=dict(colors=[COPPER, NAVY_LT], line=dict(color=NAVY, width=2)),
-            textinfo="percent", textfont=dict(color=WHITE, size=12)
+            marker=dict(colors=[COPPER, NAVY_LT], line=dict(color="#ffffff", width=3)),
+            textinfo="percent", textfont=dict(color="#ffffff", size=12)
         ))
         alay(figA2, showlegend=True,
-             legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5,
-                         font=dict(color=ICE, size=11)),
+             legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
              annotations=[dict(text=f"€{tot_sales - tot_final:+,.0f}", x=0.5, y=0.5,
                                 font=dict(size=15, color=bal_color, family="Inter"), showarrow=False)])
         st.plotly_chart(figA2, use_container_width=True)
@@ -393,54 +443,45 @@ rowB1, rowB2 = st.columns(2)
 
 with rowB1:
     with st.container(border=True):
-        sec("📈","LME Balance by Fixation")
+        sec("📈","LME Balance by Fixation", "Positive = favorable to COFICAB")
         figB1 = px.bar(view_fix, x="Fixation", y="LME_Balance_Eur", color="Group",
-                        barmode="group", text_auto=",.0f",
-                        color_discrete_sequence=PALETTE)
-        figB1.add_hline(y=0, line_color="rgba(255,255,255,0.15)")
-        figB1.update_traces(textfont=dict(size=10, color=ICE), textposition="outside")
+                        barmode="group", text_auto=",.0f", color_discrete_sequence=PALETTE)
+        figB1.add_hline(y=0, line_color="#dde3f0")
+        figB1.update_traces(textfont=dict(size=10, color=INK), textposition="outside")
         alay(figB1, showlegend=len(groups) > 1,
-             yaxis=dict(title="LME Balance (€)", gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color=SLATE)),
-             xaxis=dict(title="", tickfont=dict(color=SLATE)),
-             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-                         font=dict(color=ICE, size=10)))
+             yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
+             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(figB1, use_container_width=True)
 
 with rowB2:
     with st.container(border=True):
-        sec("💰","Sales vs Valuation by Fixation")
+        sec("💰","Sales vs Valuation", "By fixation, aggregated across selection")
         melted = view_fix.groupby("Fixation")[["Sales_Value","Final_Value"]].sum().reset_index()
         figB2 = go.Figure()
         figB2.add_trace(go.Bar(name="Sales", y=melted["Fixation"], x=melted["Sales_Value"],
                                 orientation="h", marker_color=COPPER))
         figB2.add_trace(go.Bar(name="Stock+Purchase", y=melted["Fixation"], x=melted["Final_Value"],
                                 orientation="h", marker_color=NAVY_LT))
-        alay(figB2, barmode="group",
-             xaxis=dict(title="Value (€)", gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color=SLATE)),
-             yaxis=dict(title="", tickfont=dict(color=SLATE)),
-             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-                         font=dict(color=ICE, size=10)))
+        alay(figB2, barmode="group", xaxis=dict(title="Value (€)"), yaxis=dict(title=""),
+             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(figB2, use_container_width=True)
 
 # ══════════════════════ ROW C — ENTITY x MONTH COMPARISON ══════════════════════
 if len(sel_e) > 1 or len(sel_m) > 1:
     with st.container(border=True):
-        sec("🌍","Balance by Entity & Month")
+        sec("🌍","Balance by Entity & Month", "Side-by-side comparison")
         figC = px.bar(view_tot, x="Month", y="LME_Balance_Eur", color="Entity",
                       barmode="group", text_auto=",.0f",
                       category_orders={"Month": month_order}, color_discrete_map=ENT_COLOR)
-        figC.add_hline(y=0, line_color="rgba(255,255,255,0.15)")
-        figC.update_traces(textfont=dict(size=10, color=ICE), textposition="outside")
-        alay(figC, showlegend=True,
-             yaxis=dict(title="LME Balance (€)", gridcolor="rgba(255,255,255,0.04)", tickfont=dict(color=SLATE)),
-             xaxis=dict(title="", tickfont=dict(color=SLATE)),
-             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-                         font=dict(color=ICE, size=10)))
+        figC.add_hline(y=0, line_color="#dde3f0")
+        figC.update_traces(textfont=dict(size=10, color=INK), textposition="outside")
+        alay(figC, showlegend=True, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
+             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(figC, use_container_width=True)
 
 # ══════════════════════ INSIGHTS ══════════════════════
 with st.container(border=True):
-    sec("🧠","Result Interpretation")
+    sec("🧠","Result Interpretation", "Auto-generated from the current selection")
     if len(groups) == 1:
         for line in generate_balance_insights(view_fix, view_tot):
             st.markdown(f"- {line}")
@@ -473,11 +514,11 @@ with st.expander("📋 Full LME Balance Table", expanded=False):
 
     st.dataframe(
         disp.style.format(fmt)
-            .set_properties(**{"background-color":NAVY_MD,"color":ICE})
-            .map(lambda v:"color:#10b981;font-weight:700" if isinstance(v,(int,float)) and v>0
-                 else ("color:#f43f5e;font-weight:700" if isinstance(v,(int,float)) and v<0 else ""),
+            .set_properties(**{"background-color":"#ffffff","color":INK})
+            .map(lambda v:"color:#0d9488;font-weight:700" if isinstance(v,(int,float)) and v>0
+                 else ("color:#e11d48;font-weight:700" if isinstance(v,(int,float)) and v<0 else ""),
                  subset=["LME Balance (€)"])
-            .map(lambda v:"font-weight:700;color:#d4a97a" if str(v).strip().upper()=="TOTAL" else "",
+            .map(lambda v:"font-weight:700;color:#c2703d" if str(v).strip().upper()=="TOTAL" else "",
                  subset=["Fixation"]),
         use_container_width=True, hide_index=True, height=380
     )
@@ -488,7 +529,7 @@ with st.expander("📋 Full LME Balance Table", expanded=False):
         file_name="lme_balance_consolidated.csv", mime="text/csv"
     )
 
-st.markdown(f"""<div style="text-align:center;color:#1a2e4a;font-size:0.72rem;
-  margin-top:48px;padding:16px;border-top:1px solid rgba(139,94,60,0.12);">
-  Balance LME &nbsp;·&nbsp; COFICAB Kenitra &amp; COFICAB Maroc &nbsp;·&nbsp;
+st.markdown(f"""<div style="text-align:center;color:#a3abbd;font-size:0.72rem;
+  margin-top:40px;padding:16px;border-top:1px solid #e9edf5;">
+  Balance LME &nbsp;·&nbsp; COFICAB Kenitra &amp; COFICAB Maroc
 </div>""", unsafe_allow_html=True)
