@@ -78,6 +78,17 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;color:#16264a;}
 [data-testid="stExpander"] summary *,
 [data-testid="stExpander"] p{color:#16264a !important;}
 [data-testid="stExpander"]{background:#ffffff !important;border:1px solid #e9edf5 !important;}
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] details,
+[data-testid="stExpander"] details[open],
+[data-testid="stExpander"] details[open] summary,
+[data-testid="stExpander"] summary:hover,
+[data-testid="stExpander"] summary:focus,
+[data-testid="stExpander"] summary:active{
+  background:#ffffff !important;
+  background-color:#ffffff !important;
+}
+[data-testid="stExpanderDetails"]{background:#ffffff !important;}
 
 /* Multiselect / select widgets — force white control + dropdown backgrounds everywhere */
 div[data-baseweb="select"] > div{background:#ffffff !important;border-color:#c7d7f2 !important;}
