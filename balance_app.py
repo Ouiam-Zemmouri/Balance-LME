@@ -69,6 +69,16 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;color:#16264a;}
 [data-testid="stSidebar"] *{color:#16264a !important;}
 [data-testid="stSidebar"] hr{border-color:#e6e9f2 !important;}
 
+/* Safety net: force dark text everywhere in the main content area — inline styles
+   (KPI values, badges, etc.) still win since they carry higher CSS specificity */
+[data-testid="stAppViewContainer"] *{color:#16264a;}
+
+/* Expanders (native widget headers) were rendering white-on-white — force dark text */
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary *,
+[data-testid="stExpander"] p{color:#16264a !important;}
+[data-testid="stExpander"]{background:#ffffff !important;border:1px solid #e9edf5 !important;}
+
 /* Multiselect / select widgets — force white control + dropdown backgrounds everywhere */
 div[data-baseweb="select"] > div{background:#ffffff !important;border-color:#c7d7f2 !important;}
 div[data-baseweb="popover"]{background:#ffffff !important;}
