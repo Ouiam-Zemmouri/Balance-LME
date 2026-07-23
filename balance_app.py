@@ -595,6 +595,65 @@ with rowB2:
              legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(figB2, use_container_width=True, theme=None)
 
+# ══════════════════════ FIXATION DETAIL (main focus) ══════════════════════
+with st.container(border=True):
+    sec("🔍","Fixation Detail", "Full breakdown per fixation, aggregated across the current selection")
+
+    fix_summary = view_fix.groupby("Fixation").agg(
+        Qty_Sold_T=("Qty_Sold_T","sum"),
+        Qty_Stock_T=("Qty_Stock_T","sum"),
+        Qty_Purchase_T=("Qty_Purchase_T","sum"),
+        Needs_Exceed_T=("Needs_Exceed_T","sum"),
+        Sales_Value=("Sales_Value","sum"),
+        Final_Value=("Final_Value","sum"),
+        LME_Balance_Eur=("LME_Balance_Eur","sum"),
+    ).reset_index()
+    fix_summary["Avg_Sales_LME"] = fix_summary["Sales_Value"] / fix_summary["Qty_Sold_T"].replace(0, pd.NA)
+    fix_summary["Balance_per_T"] = fix_summary["LME_Balance_Eur"] / fix_summary["Qty_Sold_T"].replace(0, pd.NA)
+    fix_summary = fix_summary.sort_values("Fixation")
+
+    disp_fs = fix_summary.rename(columns={
+        "Fixation":"Fixation","Qty_Sold_T":"Qty Sold (T)","Qty_Stock_T":"Qty Stock (T)",
+        "Qty_Purchase_T":"Qty Purchase (T)","Needs_Exceed_T":"Needs(+)/Exceed(-) (T)",
+        "Avg_Sales_LME":"Avg Sales LME (€/kg)","Sales_Value":"Sales Value (€)",
+        "Final_Value":"Stock+Purchase Value (€)","LME_Balance_Eur":"LME Balance (€)",
+        "Balance_per_T":"Balance per Ton (€/T)"
+    })
+    disp_fs = disp_fs[["Fixation","Qty Sold (T)","Qty Stock (T)","Qty Purchase (T)",
+                        "Needs(+)/Exceed(-) (T)","Avg Sales LME (€/kg)","Sales Value (€)",
+                        "Stock+Purchase Value (€)","LME Balance (€)","Balance per Ton (€/T)"]]
+
+    fmt_fs = {
+        "Qty Sold (T)":"{:,.1f}", "Qty Stock (T)":"{:,.1f}", "Qty Purchase (T)":"{:,.1f}",
+        "Needs(+)/Exceed(-) (T)":"{:,.1f}", "Avg Sales LME (€/kg)":"{:.4f}",
+        "Sales Value (€)":"€{:,.0f}", "Stock+Purchase Value (€)":"€{:,.0f}",
+        "LME Balance (€)":"€{:,.0f}", "Balance per Ton (€/T)":"€{:,.1f}",
+    }
+    st.dataframe(
+        disp_fs.style.format(fmt_fs)
+            .set_properties(**{"background-color":"#ffffff","color":INK})
+            .map(lambda v:"color:#0d9488;font-weight:700" if isinstance(v,(int,float)) and v>0
+                 else ("color:#e11d48;font-weight:700" if isinstance(v,(int,float)) and v<0 else ""),
+                 subset=["LME Balance (€)","Balance per Ton (€/T)"]),
+        use_container_width=True, hide_index=True, height=38*len(disp_fs)+40
+    )
+
+    fix_trend = (view_fix.groupby(["Fixation","MonthKey","Month"])["LME_Balance_Eur"]
+                 .sum().reset_index().sort_values("MonthKey"))
+    if fix_trend["MonthKey"].nunique() > 1:
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+        figFT = px.line(fix_trend, x="Month", y="LME_Balance_Eur", color="Fixation",
+                        markers=True, category_orders={"Month": month_order},
+                        color_discrete_sequence=PALETTE)
+        figFT.update_traces(line=dict(width=3), marker=dict(size=8))
+        figFT.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
+        alay(figFT, title="LME Balance (€) — Trend per Fixation",
+             yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
+             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        st.plotly_chart(figFT, use_container_width=True, theme=None)
+    else:
+        st.caption("Add more monthly files to unlock the per-fixation trend view.")
+
 # ══════════════════════ ROW C — ENTITY x MONTH COMPARISON ══════════════════════
 if len(sel_e) > 1 or len(sel_m) > 1:
     with st.container(border=True):
@@ -655,7 +714,7 @@ st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 # ══════════════════════ INSIGHTS ══════════════════════
 with st.container(border=True):
-    sec("🧠","Result Interpretation")
+    sec("🧠","Result Interpretation", "Auto-generated from the current selection")
     if len(groups) == 1:
         for line in generate_balance_insights(view_fix, view_tot):
             st.markdown(f"- {line}")
@@ -666,6 +725,42 @@ with st.container(border=True):
                 sub_tot = view_tot[view_tot["Group"] == g]
                 for line in generate_balance_insights(sub_fix, sub_tot):
                     st.markdown(f"- {line}")
+
+# ══════════════════════ FULL DATA TABLE ══════════════════════
+with st.expander("📋 Full LME Balance Table", expanded=False):
+    disp_cols = ["Entity","Month","Fixation","Qty_Sold_T","LME_Sales","Sales_Value",
+                 "Qty_Stock_T","LME_Stock","Stock_Value","Qty_Purchase_T","LME_Purchase",
+                 "Purchase_Value","Needs_Exceed_T","Last_QTY_T","LME_Final","Final_Value",
+                 "LME_Balance_Eur"]
+    disp = view[disp_cols].reset_index(drop=True)
+    disp.columns = ["Entity","Month","Fixation","Qty Sold (T)","LME Sales (€/kg)","Sales Value (€)",
+                    "Qty Stock (T)","LME Stock (€/kg)","Stock Value (€)","Qty Purchase (T)",
+                    "LME Purchase (€/kg)","Purchase Value (€)","Needs(+)/Exceed(-) (T)",
+                    "Final Qty (T)","LME Final (€/kg)","Final Value (€)","LME Balance (€)"]
+
+    qty_cols = ["Qty Sold (T)","Qty Stock (T)","Qty Purchase (T)","Needs(+)/Exceed(-) (T)","Final Qty (T)"]
+    lme_cols = ["LME Sales (€/kg)","LME Stock (€/kg)","LME Purchase (€/kg)","LME Final (€/kg)"]
+    eur_cols = ["Sales Value (€)","Stock Value (€)","Purchase Value (€)","Final Value (€)","LME Balance (€)"]
+    fmt = {c:"{:,.2f}" for c in qty_cols}
+    fmt.update({c:"{:.4f}" for c in lme_cols})
+    fmt.update({c:"€{:,.0f}" for c in eur_cols})
+
+    st.dataframe(
+        disp.style.format(fmt)
+            .set_properties(**{"background-color":"#ffffff","color":INK})
+            .map(lambda v:"color:#0d9488;font-weight:700" if isinstance(v,(int,float)) and v>0
+                 else ("color:#e11d48;font-weight:700" if isinstance(v,(int,float)) and v<0 else ""),
+                 subset=["LME Balance (€)"])
+            .map(lambda v:"font-weight:700;color:#c2703d" if str(v).strip().upper()=="TOTAL" else "",
+                 subset=["Fixation"]),
+        use_container_width=True, hide_index=True, height=380
+    )
+
+    st.download_button(
+        "⬇️ Download consolidated balance (CSV)",
+        data=view[disp_cols].to_csv(index=False).encode("utf-8"),
+        file_name="lme_balance_consolidated.csv", mime="text/csv"
+    )
 
 st.markdown(f"""<div style="text-align:center;color:#a3abbd;font-size:0.72rem;
   margin-top:40px;padding:16px;border-top:1px solid #e9edf5;">
