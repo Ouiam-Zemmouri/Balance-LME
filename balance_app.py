@@ -502,6 +502,120 @@ if view.empty:
 groups = sorted(view["Group"].unique())
 month_order = month_map[month_map["Month"].isin(sel_m)]["Month"].tolist()
 
+# ══════════════════════ METHODOLOGY ══════════════════════
+with st.expander("📖 Methodology — What the LME Balance Is & How It's Calculated", expanded=True):
+    st.markdown(f"""
+<div style="color:{INK};font-size:0.92rem;line-height:1.65;">
+
+<p><strong>What is the LME Balance?</strong><br>
+COFICAB sells cable and wire products whose copper content is invoiced against a specific
+London Metal Exchange (LME) fixing. The physical copper actually consumed to manufacture what
+was sold, however, was purchased and stocked earlier — often referencing a <em>different</em>
+LME fixing. The <strong>LME Balance</strong> measures the euro gain or loss created by this
+timing mismatch between the price used to sell and the price of the copper actually consumed,
+computed separately for each fixation category (3M-1, 3M-2, M-1…), since each one carries its
+own cost basis.</p>
+
+<p><strong>The FIFO matching logic — how a sale is costed, step by step:</strong><br>
+For each fixation, the quantity sold during the month must be matched, in strict
+First-In-First-Out order, against the following sources — in this sequence:</p>
+
+<ol style="margin-top:6px;">
+<li><strong>Stock carried over from the previous month</strong>, on the <em>same</em> fixation,
+is used first.</li>
+<li>If that stock does not cover the full quantity sold, the shortfall is covered by
+<strong>purchases consumed during the current month</strong>, still on the same fixation.</li>
+<li>If a shortfall still remains after using the fixation's own stock and purchases, the
+remaining quantity is <strong>reallocated from the next fixation in the FIFO sequence</strong> —
+drawing from whatever surplus stock or purchase quantity that other fixation still has available.</li>
+</ol>
+
+<p>Each portion of the final quantity sold is therefore valorized at the LME fixing price of its
+own source (own stock, own purchases, or reallocated stock/purchases from another fixation),
+giving a single blended cost basis for the month.</p>
+
+</div>
+""", unsafe_allow_html=True)
+
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+    # ── FIFO cascade diagram ──
+    st.markdown(f"""
+<svg viewBox="0 0 900 660" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="{SLATE}"/>
+    </marker>
+  </defs>
+
+  <!-- Step 1 -->
+  <rect x="130" y="10" width="420" height="66" rx="12" fill="{NAVY_MD}"/>
+  <text x="340" y="38" text-anchor="middle" fill="#ffffff" font-size="15" font-weight="700" font-family="Inter">① Monthly Sales — Fixation F</text>
+  <text x="340" y="60" text-anchor="middle" fill="#c9d4ea" font-size="12" font-family="Inter">Quantity to cover: Qty Sold (T)</text>
+
+  <line x1="340" y1="76" x2="340" y2="118" stroke="{SLATE}" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="352" y="102" fill="{SLATE}" font-size="11" font-family="Inter">covered first by ↓</text>
+
+  <!-- Step 2 -->
+  <rect x="130" y="120" width="420" height="66" rx="12" fill="{NAVY_LT}"/>
+  <text x="340" y="148" text-anchor="middle" fill="#ffffff" font-size="15" font-weight="700" font-family="Inter">② Stock — Previous Month, Same Fixation</text>
+  <text x="340" y="170" text-anchor="middle" fill="#e3ebfb" font-size="12" font-family="Inter">Available: Qty Stock (T)</text>
+
+  <line x1="550" y1="153" x2="670" y2="153" stroke="{TEAL}" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="608" y="145" text-anchor="middle" fill="{TEAL}" font-size="11" font-family="Inter">if sufficient</text>
+  <rect x="672" y="120" width="180" height="66" rx="12" fill="#e6f7f4" stroke="{TEAL}" stroke-width="1.5"/>
+  <text x="762" y="148" text-anchor="middle" fill="{TEAL}" font-size="12" font-weight="700" font-family="Inter">✅ Fully covered</text>
+  <text x="762" y="166" text-anchor="middle" fill="{TEAL}" font-size="10.5" font-family="Inter">valued at Stock LME price</text>
+
+  <line x1="340" y1="186" x2="340" y2="228" stroke="{SLATE}" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="352" y="212" fill="{SLATE}" font-size="11" font-family="Inter">if shortfall remains ↓</text>
+
+  <!-- Step 3 -->
+  <rect x="130" y="230" width="420" height="66" rx="12" fill="{NAVY_LT}"/>
+  <text x="340" y="258" text-anchor="middle" fill="#ffffff" font-size="15" font-weight="700" font-family="Inter">③ Purchases Consumed This Month, Same Fixation</text>
+  <text x="340" y="280" text-anchor="middle" fill="#e3ebfb" font-size="12" font-family="Inter">Available: Qty Purchase (T)</text>
+
+  <line x1="550" y1="263" x2="670" y2="263" stroke="{TEAL}" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="608" y="255" text-anchor="middle" fill="{TEAL}" font-size="11" font-family="Inter">if sufficient</text>
+  <rect x="672" y="230" width="180" height="66" rx="12" fill="#e6f7f4" stroke="{TEAL}" stroke-width="1.5"/>
+  <text x="762" y="256" text-anchor="middle" fill="{TEAL}" font-size="12" font-weight="700" font-family="Inter">✅ Covered by</text>
+  <text x="762" y="272" text-anchor="middle" fill="{TEAL}" font-size="10.5" font-family="Inter">Stock + Purchases</text>
+
+  <line x1="340" y1="296" x2="340" y2="338" stroke="{SLATE}" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="352" y="322" fill="{SLATE}" font-size="11" font-family="Inter">if still short ↓</text>
+
+  <!-- Step 4 — Reallocation (highlighted) -->
+  <rect x="110" y="340" width="460" height="86" rx="12" fill="{GOLD}"/>
+  <text x="340" y="370" text-anchor="middle" fill="#ffffff" font-size="15" font-weight="800" font-family="Inter">④ Reallocation — Next Fixation (FIFO order)</text>
+  <text x="340" y="392" text-anchor="middle" fill="#fff3e0" font-size="12" font-family="Inter">Remaining quantity is pulled from the surplus</text>
+  <text x="340" y="408" text-anchor="middle" fill="#fff3e0" font-size="12" font-family="Inter">stock/purchase of the next fixation in sequence</text>
+
+  <line x1="340" y1="426" x2="340" y2="468" stroke="{SLATE}" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 5 — Final -->
+  <rect x="90" y="470" width="500" height="86" rx="12" fill="{COPPER}"/>
+  <text x="340" y="500" text-anchor="middle" fill="#ffffff" font-size="15" font-weight="800" font-family="Inter">⑤ Final Valorized Quantity &amp; LME Balance</text>
+  <text x="340" y="522" text-anchor="middle" fill="#fdeee0" font-size="12" font-family="Inter">LME Balance (€) = Sales Value (€) − Valorized Cost</text>
+  <text x="340" y="538" text-anchor="middle" fill="#fdeee0" font-size="12" font-family="Inter">(Stock + Purchases + Reallocated Quantity)</text>
+
+  <!-- Legend -->
+  <rect x="90" y="580" width="16" height="16" rx="4" fill="{TEAL}"/>
+  <text x="114" y="593" fill="{INK}" font-size="12" font-family="Inter">Positive balance — favorable to COFICAB (sold above FIFO cost)</text>
+  <rect x="90" y="608" width="16" height="16" rx="4" fill="{ROSE}"/>
+  <text x="114" y="621" fill="{INK}" font-size="12" font-family="Inter">Negative balance — unfavorable (sold below FIFO cost)</text>
+</svg>
+""", unsafe_allow_html=True)
+
+    st.markdown(f"""
+<div style="color:{SLATE};font-size:0.85rem;margin-top:10px;padding-top:10px;border-top:1px solid #e9edf5;">
+💡 <strong>Reading the "Needs(+)/Exceed(-)" column</strong>: for a given fixation, a
+<strong>positive</strong> value means its own stock + purchases were insufficient — the
+remainder was reallocated from the next fixation (step ④ above). A <strong>negative</strong>
+value means that fixation had a surplus, which may itself be used to cover another
+fixation's shortfall.
+</div>
+""", unsafe_allow_html=True)
+
 # ══════════════════════ KPI ROW ══════════════════════
 tot_sales   = view_tot["Sales_Value"].sum()
 tot_final   = view_tot["Final_Value"].sum()
