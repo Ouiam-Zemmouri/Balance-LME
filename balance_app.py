@@ -451,7 +451,7 @@ for e in errors:
 
 if bal_all.empty:
     st.markdown("""<div class="title-banner">
-      <div><h1>⚖️ Balance LME</h1><p>FIFO Method · Sales vs Stock &amp; Purchase Valuation</p></div>
+      <div><h1 style="color:#ffffff !important;">⚖️ Balance LME</h1><p style="color:#a8c0e8 !important;">FIFO Method · Sales vs Stock &amp; Purchase Valuation</p></div>
     </div>""", unsafe_allow_html=True)
     st.info(
         f"No balance files found yet. Add your monthly `.xlsx` files "
@@ -486,8 +486,8 @@ view_tot = view[view["Fixation"].str.upper() == "TOTAL"].copy()
 # ── HEADER BANNER ──
 st.markdown(f"""<div class="title-banner">
   <div>
-    <h1>⚖️ Balance LME</h1>
-    <p>FIFO Method · Sales vs Stock &amp; Purchase Valuation</p>
+    <h1 style="color:#ffffff !important;">⚖️ Balance LME</h1>
+    <p style="color:#a8c0e8 !important;">FIFO Method · Sales vs Stock &amp; Purchase Valuation</p>
   </div>
   <div class="badge-strip">
     <div class="badge">🏭 {', '.join(sel_e) if len(sel_e)<=2 else f'{len(sel_e)} entities'}</div>
