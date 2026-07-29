@@ -641,207 +641,278 @@ kpi(k5,"✅","Favorable Periods",      f"{n_fav} / {n_tot}",   TEAL if n_fav==n_
 
 st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
-# ══════════════════════ ROW A — TREND + SPLIT ══════════════════════
-rowA1, rowA2 = st.columns([2,1])
+# ══════════════════════ MAIN TABS ══════════════════════
+tab_overview, tab_entity, tab_fixation, tab_gl, tab_insights, tab_data = st.tabs(
+    ["📊 Overview", "🏭 By Entity", "🔍 By Fixation", "💹 Gains & Losses", "🧠 Insights", "📋 Data"]
+)
 
-with rowA1:
+# ─────────────────────────── TAB: OVERVIEW ───────────────────────────
+with tab_overview:
+    rowA1, rowA2 = st.columns([2,1])
+
+    with rowA1:
+        with st.container(border=True):
+            sec("📅","Net LME Balance — Trend", "Monthly evolution by entity")
+            trend = (view_tot.groupby(["Entity","MonthKey","Month"])["LME_Balance_Eur"]
+                     .sum().reset_index().sort_values("MonthKey"))
+            if trend["MonthKey"].nunique() > 1:
+                figA1 = px.line(trend, x="Month", y="LME_Balance_Eur", color="Entity",
+                                 markers=True, category_orders={"Month": month_order},
+                                 color_discrete_map=ENT_COLOR)
+                figA1.update_traces(line=dict(width=3), marker=dict(size=9))
+                figA1.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
+                alay(figA1, showlegend=len(sel_e) > 1,
+                     yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
+                st.plotly_chart(figA1, use_container_width=True, theme=None)
+            else:
+                figA1 = px.bar(view_tot, x="Entity", y="LME_Balance_Eur", color="Entity",
+                                color_discrete_map=ENT_COLOR, text_auto=",.0f")
+                figA1.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
+                alay(figA1, showlegend=False, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
+                st.plotly_chart(figA1, use_container_width=True, theme=None)
+                st.caption("Add more monthly files to unlock the trend view.")
+
+    with rowA2:
+        with st.container(border=True):
+            sec("🥯","Valuation Split", "Sales vs cost basis")
+            donut_df = pd.DataFrame({"Component": ["Sales", "Stock + Purchase"], "Value": [tot_sales, tot_final]})
+            figA2 = go.Figure(go.Pie(
+                labels=donut_df["Component"], values=donut_df["Value"], hole=0.62,
+                marker=dict(colors=[COPPER, NAVY_LT], line=dict(color="#ffffff", width=3)),
+                textinfo="percent", textfont=dict(color="#ffffff", size=12)
+            ))
+            alay(figA2, showlegend=True,
+                 legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
+                 annotations=[dict(text=f"€{tot_sales - tot_final:+,.0f}", x=0.5, y=0.5,
+                                    font=dict(size=15, color=bal_color, family="Inter"), showarrow=False)])
+            st.plotly_chart(figA2, use_container_width=True, theme=None)
+
+    if len(sel_e) > 1 or len(sel_m) > 1:
+        with st.container(border=True):
+            sec("🌍","Balance by Entity & Month", "Side-by-side comparison")
+            figC = px.bar(view_tot, x="Month", y="LME_Balance_Eur", color="Entity",
+                          barmode="group", text_auto=",.0f",
+                          category_orders={"Month": month_order}, color_discrete_map=ENT_COLOR)
+            figC.add_hline(y=0, line_color="#dde3f0")
+            figC.update_traces(textfont=dict(size=10, color=INK), textposition="outside")
+            alay(figC, showlegend=True, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
+                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(figC, use_container_width=True, theme=None)
+
+# ─────────────────────────── TAB: BY ENTITY ───────────────────────────
+with tab_entity:
+    st.caption("LME Balance by Fixation, presented separately for each entity.")
+    for entity in sorted(sel_e):
+        ent_fix = view_fix[view_fix["Entity"] == entity]
+        ent_tot = view_tot[view_tot["Entity"] == entity]
+        if ent_fix.empty:
+            continue
+
+        e_sales = ent_tot["Sales_Value"].sum()
+        e_final = ent_tot["Final_Value"].sum()
+        e_bal   = ent_tot["LME_Balance_Eur"].sum()
+        e_qty   = ent_tot["Qty_Sold_T"].sum()
+        e_per_t = e_bal / e_qty if e_qty else 0
+        e_color = TEAL if e_bal >= 0 else ROSE
+
+        with st.container(border=True):
+            sec("🏭", entity, f"{ent_fix['MonthKey'].nunique()} month(s) in current selection")
+
+            c1,c2,c3,c4 = st.columns(4)
+            kpi(c1,"💶","Sales Valuation",  f"€{fmt_compact(e_sales)}", NAVY_MD)
+            kpi(c2,"📦","Stock + Purchase", f"€{fmt_compact(e_final)}", NAVY_LT)
+            kpi(c3,"⚖️","Net Balance",      f"€{fmt_compact(e_bal)}",   e_color)
+            kpi(c4,"📏","Balance per Ton",  f"€{e_per_t:,.1f}/T",       GOLD)
+
+            st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+            multi_month = ent_fix["MonthKey"].nunique() > 1
+            if multi_month:
+                figE = px.bar(ent_fix, x="Fixation", y="LME_Balance_Eur", color="Month",
+                              barmode="group", text_auto=",.0f",
+                              category_orders={"Month": month_order},
+                              color_discrete_sequence=PALETTE)
+            else:
+                figE = px.bar(ent_fix, x="Fixation", y="LME_Balance_Eur", text_auto=",.0f",
+                              color="Fixation", color_discrete_sequence=PALETTE)
+            figE.add_hline(y=0, line_color="#dde3f0")
+            figE.update_traces(textfont=dict(size=10, color=INK), textposition="outside")
+            alay(figE, showlegend=multi_month,
+                 yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
+                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(figE, use_container_width=True, theme=None)
+
+# ─────────────────────────── TAB: BY FIXATION ───────────────────────────
+with tab_fixation:
+    rowB1, rowB2 = st.columns(2)
+
+    with rowB1:
+        with st.container(border=True):
+            sec("📈","LME Balance by Fixation", "All entities/months combined")
+            figB1 = px.bar(view_fix, x="Fixation", y="LME_Balance_Eur", color="Group",
+                            barmode="group", text_auto=",.0f", color_discrete_sequence=PALETTE)
+            figB1.add_hline(y=0, line_color="#dde3f0")
+            figB1.update_traces(textfont=dict(size=10, color=INK), textposition="outside")
+            alay(figB1, showlegend=len(groups) > 1,
+                 yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
+                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(figB1, use_container_width=True, theme=None)
+
+    with rowB2:
+        with st.container(border=True):
+            sec("💰","Sales vs Valuation", "By fixation, aggregated across selection")
+            melted = view_fix.groupby("Fixation")[["Sales_Value","Final_Value"]].sum().reset_index()
+            figB2 = go.Figure()
+            figB2.add_trace(go.Bar(name="Sales", y=melted["Fixation"], x=melted["Sales_Value"],
+                                    orientation="h", marker_color=COPPER))
+            figB2.add_trace(go.Bar(name="Stock+Purchase", y=melted["Fixation"], x=melted["Final_Value"],
+                                    orientation="h", marker_color=NAVY_LT))
+            alay(figB2, barmode="group", xaxis=dict(title="Value (€)"), yaxis=dict(title=""),
+                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(figB2, use_container_width=True, theme=None)
+
     with st.container(border=True):
-        sec("📅","Net LME Balance — Trend", "Monthly evolution by entity")
-        trend = (view_tot.groupby(["Entity","MonthKey","Month"])["LME_Balance_Eur"]
-                 .sum().reset_index().sort_values("MonthKey"))
-        if trend["MonthKey"].nunique() > 1:
-            figA1 = px.line(trend, x="Month", y="LME_Balance_Eur", color="Entity",
-                             markers=True, category_orders={"Month": month_order},
-                             color_discrete_map=ENT_COLOR)
-            figA1.update_traces(line=dict(width=3), marker=dict(size=9))
-            figA1.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
-            alay(figA1, showlegend=len(sel_e) > 1,
-                 yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
-            st.plotly_chart(figA1, use_container_width=True, theme=None)
+        sec("🔍","Fixation Detail", "Full breakdown per fixation, aggregated across the current selection")
+
+        fix_summary = view_fix.groupby("Fixation").agg(
+            Qty_Sold_T=("Qty_Sold_T","sum"),
+            Qty_Stock_T=("Qty_Stock_T","sum"),
+            Qty_Purchase_T=("Qty_Purchase_T","sum"),
+            Needs_Exceed_T=("Needs_Exceed_T","sum"),
+            Sales_Value=("Sales_Value","sum"),
+            Final_Value=("Final_Value","sum"),
+            LME_Balance_Eur=("LME_Balance_Eur","sum"),
+        ).reset_index()
+        fix_summary["Avg_Sales_LME"] = fix_summary["Sales_Value"] / fix_summary["Qty_Sold_T"].replace(0, pd.NA)
+        fix_summary["Balance_per_T"] = fix_summary["LME_Balance_Eur"] / fix_summary["Qty_Sold_T"].replace(0, pd.NA)
+        fix_summary = fix_summary.sort_values("Fixation")
+
+        disp_fs = fix_summary.rename(columns={
+            "Fixation":"Fixation","Qty_Sold_T":"Qty Sold (T)","Qty_Stock_T":"Qty Stock (T)",
+            "Qty_Purchase_T":"Qty Purchase (T)","Needs_Exceed_T":"Needs(+)/Exceed(-) (T)",
+            "Avg_Sales_LME":"Avg Sales LME (€/kg)","Sales_Value":"Sales Value (€)",
+            "Final_Value":"Stock+Purchase Value (€)","LME_Balance_Eur":"LME Balance (€)",
+            "Balance_per_T":"Balance per Ton (€/T)"
+        })
+        disp_fs = disp_fs[["Fixation","Qty Sold (T)","Qty Stock (T)","Qty Purchase (T)",
+                            "Needs(+)/Exceed(-) (T)","Avg Sales LME (€/kg)","Sales Value (€)",
+                            "Stock+Purchase Value (€)","LME Balance (€)","Balance per Ton (€/T)"]]
+
+        fmt_fs = {
+            "Qty Sold (T)":"{:,.1f}", "Qty Stock (T)":"{:,.1f}", "Qty Purchase (T)":"{:,.1f}",
+            "Needs(+)/Exceed(-) (T)":"{:,.1f}", "Avg Sales LME (€/kg)":"{:.4f}",
+            "Sales Value (€)":"€{:,.0f}", "Stock+Purchase Value (€)":"€{:,.0f}",
+            "LME Balance (€)":"€{:,.0f}", "Balance per Ton (€/T)":"€{:,.1f}",
+        }
+        st.dataframe(
+            disp_fs.style.format(fmt_fs)
+                .set_properties(**{"background-color":"#ffffff","color":INK})
+                .map(lambda v:"color:#0d9488;font-weight:700" if isinstance(v,(int,float)) and v>0
+                     else ("color:#e11d48;font-weight:700" if isinstance(v,(int,float)) and v<0 else ""),
+                     subset=["LME Balance (€)","Balance per Ton (€/T)"]),
+            use_container_width=True, hide_index=True, height=38*len(disp_fs)+40
+        )
+
+        fix_trend = (view_fix.groupby(["Fixation","MonthKey","Month"])["LME_Balance_Eur"]
+                     .sum().reset_index().sort_values("MonthKey"))
+        if fix_trend["MonthKey"].nunique() > 1:
+            st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+            figFT = px.line(fix_trend, x="Month", y="LME_Balance_Eur", color="Fixation",
+                            markers=True, category_orders={"Month": month_order},
+                            color_discrete_sequence=PALETTE)
+            figFT.update_traces(line=dict(width=3), marker=dict(size=8))
+            figFT.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
+            alay(figFT, title="LME Balance (€) — Trend per Fixation",
+                 yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
+                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(figFT, use_container_width=True, theme=None)
         else:
-            figA1 = px.bar(view_tot, x="Entity", y="LME_Balance_Eur", color="Entity",
-                            color_discrete_map=ENT_COLOR, text_auto=",.0f")
-            figA1.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
-            alay(figA1, showlegend=False, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
-            st.plotly_chart(figA1, use_container_width=True, theme=None)
-            st.caption("Add more monthly files to unlock the trend view.")
+            st.caption("Add more monthly files to unlock the per-fixation trend view.")
 
-with rowA2:
+# ─────────────────────────── TAB: GAINS & LOSSES ───────────────────────────
+with tab_gl:
+    gl_cards = []
+    for g in groups:
+        sub_tot = view_tot[view_tot["Group"] == g]
+        g_bal = sub_tot["LME_Balance_Eur"].sum()
+        g_qty = sub_tot["Qty_Sold_T"].sum()
+        g_per_t = g_bal / g_qty if g_qty else 0
+        is_gain = g_bal >= 0
+        arrow = "▲" if is_gain else "▼"
+        delta_color = "#3ddc97" if is_gain else "#ff6b6b"
+        gl_cards.append(f"""
+          <div class="gl-card">
+            <div class="gl-card-label">{g}</div>
+            <div class="gl-card-value">€{fmt_compact(g_bal)}</div>
+            <div class="gl-card-delta" style="color:{delta_color};">{arrow} €{fmt_compact(g_per_t)}/T</div>
+          </div>""")
+
+    st.markdown(f"""<div class="gl-panel">
+      <div class="gl-panel-title">💹 Gains / Losses — LME Balance Result</div>
+      <div class="gl-grid">{''.join(gl_cards)}</div>
+    </div>""", unsafe_allow_html=True)
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+    fix_gl_cards = []
+    fix_agg = view_fix.groupby("Fixation")[["LME_Balance_Eur","Qty_Sold_T"]].sum().reset_index()
+    for _, row in fix_agg.iterrows():
+        f_bal = row["LME_Balance_Eur"]
+        f_qty = row["Qty_Sold_T"]
+        f_per_t = f_bal / f_qty if f_qty else 0
+        is_gain = f_bal >= 0
+        arrow = "▲" if is_gain else "▼"
+        delta_color = "#3ddc97" if is_gain else "#ff6b6b"
+        fix_gl_cards.append(f"""
+          <div class="gl-card">
+            <div class="gl-card-label">{row['Fixation']}</div>
+            <div class="gl-card-value">€{fmt_compact(f_bal)}</div>
+            <div class="gl-card-delta" style="color:{delta_color};">{arrow} €{fmt_compact(f_per_t)}/T</div>
+          </div>""")
+
+    st.markdown(f"""<div class="gl-panel">
+      <div class="gl-panel-title">💹 Gains / Losses — by Fixation</div>
+      <div class="gl-grid">{''.join(fix_gl_cards)}</div>
+    </div>""", unsafe_allow_html=True)
+
+    if len(sel_e) > 1:
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        ent_gl_cards = []
+        for entity in sorted(sel_e):
+            ent_tot = view_tot[view_tot["Entity"] == entity]
+            en_bal = ent_tot["LME_Balance_Eur"].sum()
+            en_qty = ent_tot["Qty_Sold_T"].sum()
+            en_per_t = en_bal / en_qty if en_qty else 0
+            is_gain = en_bal >= 0
+            arrow = "▲" if is_gain else "▼"
+            delta_color = "#3ddc97" if is_gain else "#ff6b6b"
+            ent_gl_cards.append(f"""
+              <div class="gl-card">
+                <div class="gl-card-label">{entity}</div>
+                <div class="gl-card-value">€{fmt_compact(en_bal)}</div>
+                <div class="gl-card-delta" style="color:{delta_color};">{arrow} €{fmt_compact(en_per_t)}/T</div>
+              </div>""")
+        st.markdown(f"""<div class="gl-panel">
+          <div class="gl-panel-title">💹 Gains / Losses — by Entity</div>
+          <div class="gl-grid">{''.join(ent_gl_cards)}</div>
+        </div>""", unsafe_allow_html=True)
+
+# ─────────────────────────── TAB: INSIGHTS ───────────────────────────
+with tab_insights:
     with st.container(border=True):
-        sec("🥯","Valuation Split", "Sales vs cost basis")
-        donut_df = pd.DataFrame({"Component": ["Sales", "Stock + Purchase"], "Value": [tot_sales, tot_final]})
-        figA2 = go.Figure(go.Pie(
-            labels=donut_df["Component"], values=donut_df["Value"], hole=0.62,
-            marker=dict(colors=[COPPER, NAVY_LT], line=dict(color="#ffffff", width=3)),
-            textinfo="percent", textfont=dict(color="#ffffff", size=12)
-        ))
-        alay(figA2, showlegend=True,
-             legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
-             annotations=[dict(text=f"€{tot_sales - tot_final:+,.0f}", x=0.5, y=0.5,
-                                font=dict(size=15, color=bal_color, family="Inter"), showarrow=False)])
-        st.plotly_chart(figA2, use_container_width=True, theme=None)
+        sec("🧠","Result Interpretation", "Auto-generated from the current selection")
+        if len(groups) == 1:
+            for line in generate_balance_insights(view_fix, view_tot):
+                st.markdown(f"- {line}")
+        else:
+            for g in groups:
+                with st.expander(f"📌 {g}", expanded=False):
+                    sub_fix = view_fix[view_fix["Group"] == g]
+                    sub_tot = view_tot[view_tot["Group"] == g]
+                    for line in generate_balance_insights(sub_fix, sub_tot):
+                        st.markdown(f"- {line}")
 
-# ══════════════════════ ROW B — FIXATION BREAKDOWN ══════════════════════
-rowB1, rowB2 = st.columns(2)
-
-with rowB1:
-    with st.container(border=True):
-        sec("📈","LME Balance by Fixation", "Positive = favorable to COFICAB")
-        figB1 = px.bar(view_fix, x="Fixation", y="LME_Balance_Eur", color="Group",
-                        barmode="group", text_auto=",.0f", color_discrete_sequence=PALETTE)
-        figB1.add_hline(y=0, line_color="#dde3f0")
-        figB1.update_traces(textfont=dict(size=10, color=INK), textposition="outside")
-        alay(figB1, showlegend=len(groups) > 1,
-             yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
-             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(figB1, use_container_width=True, theme=None)
-
-with rowB2:
-    with st.container(border=True):
-        sec("💰","Sales vs Valuation", "By fixation, aggregated across selection")
-        melted = view_fix.groupby("Fixation")[["Sales_Value","Final_Value"]].sum().reset_index()
-        figB2 = go.Figure()
-        figB2.add_trace(go.Bar(name="Sales", y=melted["Fixation"], x=melted["Sales_Value"],
-                                orientation="h", marker_color=COPPER))
-        figB2.add_trace(go.Bar(name="Stock+Purchase", y=melted["Fixation"], x=melted["Final_Value"],
-                                orientation="h", marker_color=NAVY_LT))
-        alay(figB2, barmode="group", xaxis=dict(title="Value (€)"), yaxis=dict(title=""),
-             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(figB2, use_container_width=True, theme=None)
-
-# ══════════════════════ FIXATION DETAIL (main focus) ══════════════════════
-with st.container(border=True):
-    sec("🔍","Fixation Detail", "Full breakdown per fixation, aggregated across the current selection")
-
-    fix_summary = view_fix.groupby("Fixation").agg(
-        Qty_Sold_T=("Qty_Sold_T","sum"),
-        Qty_Stock_T=("Qty_Stock_T","sum"),
-        Qty_Purchase_T=("Qty_Purchase_T","sum"),
-        Needs_Exceed_T=("Needs_Exceed_T","sum"),
-        Sales_Value=("Sales_Value","sum"),
-        Final_Value=("Final_Value","sum"),
-        LME_Balance_Eur=("LME_Balance_Eur","sum"),
-    ).reset_index()
-    fix_summary["Avg_Sales_LME"] = fix_summary["Sales_Value"] / fix_summary["Qty_Sold_T"].replace(0, pd.NA)
-    fix_summary["Balance_per_T"] = fix_summary["LME_Balance_Eur"] / fix_summary["Qty_Sold_T"].replace(0, pd.NA)
-    fix_summary = fix_summary.sort_values("Fixation")
-
-    disp_fs = fix_summary.rename(columns={
-        "Fixation":"Fixation","Qty_Sold_T":"Qty Sold (T)","Qty_Stock_T":"Qty Stock (T)",
-        "Qty_Purchase_T":"Qty Purchase (T)","Needs_Exceed_T":"Needs(+)/Exceed(-) (T)",
-        "Avg_Sales_LME":"Avg Sales LME (€/kg)","Sales_Value":"Sales Value (€)",
-        "Final_Value":"Stock+Purchase Value (€)","LME_Balance_Eur":"LME Balance (€)",
-        "Balance_per_T":"Balance per Ton (€/T)"
-    })
-    disp_fs = disp_fs[["Fixation","Qty Sold (T)","Qty Stock (T)","Qty Purchase (T)",
-                        "Needs(+)/Exceed(-) (T)","Avg Sales LME (€/kg)","Sales Value (€)",
-                        "Stock+Purchase Value (€)","LME Balance (€)","Balance per Ton (€/T)"]]
-
-    fmt_fs = {
-        "Qty Sold (T)":"{:,.1f}", "Qty Stock (T)":"{:,.1f}", "Qty Purchase (T)":"{:,.1f}",
-        "Needs(+)/Exceed(-) (T)":"{:,.1f}", "Avg Sales LME (€/kg)":"{:.4f}",
-        "Sales Value (€)":"€{:,.0f}", "Stock+Purchase Value (€)":"€{:,.0f}",
-        "LME Balance (€)":"€{:,.0f}", "Balance per Ton (€/T)":"€{:,.1f}",
-    }
-    st.dataframe(
-        disp_fs.style.format(fmt_fs)
-            .set_properties(**{"background-color":"#ffffff","color":INK})
-            .map(lambda v:"color:#0d9488;font-weight:700" if isinstance(v,(int,float)) and v>0
-                 else ("color:#e11d48;font-weight:700" if isinstance(v,(int,float)) and v<0 else ""),
-                 subset=["LME Balance (€)","Balance per Ton (€/T)"]),
-        use_container_width=True, hide_index=True, height=38*len(disp_fs)+40
-    )
-
-    fix_trend = (view_fix.groupby(["Fixation","MonthKey","Month"])["LME_Balance_Eur"]
-                 .sum().reset_index().sort_values("MonthKey"))
-    if fix_trend["MonthKey"].nunique() > 1:
-        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-        figFT = px.line(fix_trend, x="Month", y="LME_Balance_Eur", color="Fixation",
-                        markers=True, category_orders={"Month": month_order},
-                        color_discrete_sequence=PALETTE)
-        figFT.update_traces(line=dict(width=3), marker=dict(size=8))
-        figFT.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
-        alay(figFT, title="LME Balance (€) — Trend per Fixation",
-             yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
-             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(figFT, use_container_width=True, theme=None)
-    else:
-        st.caption("Add more monthly files to unlock the per-fixation trend view.")
-
-# ══════════════════════ ROW C — ENTITY x MONTH COMPARISON ══════════════════════
-if len(sel_e) > 1 or len(sel_m) > 1:
-    with st.container(border=True):
-        sec("🌍","Balance by Entity & Month", "Side-by-side comparison")
-        figC = px.bar(view_tot, x="Month", y="LME_Balance_Eur", color="Entity",
-                      barmode="group", text_auto=",.0f",
-                      category_orders={"Month": month_order}, color_discrete_map=ENT_COLOR)
-        figC.add_hline(y=0, line_color="#dde3f0")
-        figC.update_traces(textfont=dict(size=10, color=INK), textposition="outside")
-        alay(figC, showlegend=True, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
-             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(figC, use_container_width=True, theme=None)
-
-# ══════════════════════ GAINS / LOSSES ══════════════════════
-gl_cards = []
-for g in groups:
-    sub_tot = view_tot[view_tot["Group"] == g]
-    g_bal = sub_tot["LME_Balance_Eur"].sum()
-    g_qty = sub_tot["Qty_Sold_T"].sum()
-    g_per_t = g_bal / g_qty if g_qty else 0
-    is_gain = g_bal >= 0
-    arrow = "▲" if is_gain else "▼"
-    delta_color = "#3ddc97" if is_gain else "#ff6b6b"
-    gl_cards.append(f"""
-      <div class="gl-card">
-        <div class="gl-card-label">{g}</div>
-        <div class="gl-card-value">€{fmt_compact(g_bal)}</div>
-        <div class="gl-card-delta" style="color:{delta_color};">{arrow} €{fmt_compact(g_per_t)}/T</div>
-      </div>""")
-
-st.markdown(f"""<div class="gl-panel">
-  <div class="gl-panel-title">💹 Gains / Losses — LME Balance Result</div>
-  <div class="gl-grid">{''.join(gl_cards)}</div>
-</div>""", unsafe_allow_html=True)
-st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
-fix_gl_cards = []
-fix_agg = view_fix.groupby("Fixation")[["LME_Balance_Eur","Qty_Sold_T"]].sum().reset_index()
-for _, row in fix_agg.iterrows():
-    f_bal = row["LME_Balance_Eur"]
-    f_qty = row["Qty_Sold_T"]
-    f_per_t = f_bal / f_qty if f_qty else 0
-    is_gain = f_bal >= 0
-    arrow = "▲" if is_gain else "▼"
-    delta_color = "#3ddc97" if is_gain else "#ff6b6b"
-    fix_gl_cards.append(f"""
-      <div class="gl-card">
-        <div class="gl-card-label">{row['Fixation']}</div>
-        <div class="gl-card-value">€{fmt_compact(f_bal)}</div>
-        <div class="gl-card-delta" style="color:{delta_color};">{arrow} €{fmt_compact(f_per_t)}/T</div>
-      </div>""")
-
-st.markdown(f"""<div class="gl-panel">
-  <div class="gl-panel-title">💹 Gains / Losses — by Fixation</div>
-  <div class="gl-grid">{''.join(fix_gl_cards)}</div>
-</div>""", unsafe_allow_html=True)
-st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
-# ══════════════════════ INSIGHTS ══════════════════════
-with st.container(border=True):
-    sec("🧠","Result Interpretation", "Auto-generated from the current selection")
-    if len(groups) == 1:
-        for line in generate_balance_insights(view_fix, view_tot):
-            st.markdown(f"- {line}")
-    else:
-        for g in groups:
-            with st.expander(f"📌 {g}", expanded=False):
-                sub_fix = view_fix[view_fix["Group"] == g]
-                sub_tot = view_tot[view_tot["Group"] == g]
-                for line in generate_balance_insights(sub_fix, sub_tot):
-                    st.markdown(f"- {line}")
-
-# ══════════════════════ FULL DATA TABLE ══════════════════════
-with st.expander("📋 Full LME Balance Table", expanded=False):
+# ─────────────────────────── TAB: DATA ───────────────────────────
+with tab_data:
     disp_cols = ["Entity","Month","Fixation","Qty_Sold_T","LME_Sales","Sales_Value",
                  "Qty_Stock_T","LME_Stock","Stock_Value","Qty_Purchase_T","LME_Purchase",
                  "Purchase_Value","Needs_Exceed_T","Last_QTY_T","LME_Final","Final_Value",
@@ -867,7 +938,7 @@ with st.expander("📋 Full LME Balance Table", expanded=False):
                  subset=["LME Balance (€)"])
             .map(lambda v:"font-weight:700;color:#c2703d" if str(v).strip().upper()=="TOTAL" else "",
                  subset=["Fixation"]),
-        use_container_width=True, hide_index=True, height=380
+        use_container_width=True, hide_index=True, height=440
     )
 
     st.download_button(
