@@ -249,15 +249,17 @@ def kpi(col, icon, label, val, color=NAVY_MD, sub=None, spark=None):
         b64 = sparkline_b64(spark, color)
         if b64:
             spark_html = f'<img class="kpi-spark" src="data:image/png;base64,{b64}"/>'
-    col.markdown(f"""<div class="kpi-card">
-      <div class="kpi-top">
-        <div class="kpi-icon" style="background:{color}1a;color:{color};">{icon}</div>
-        <div class="kpi-label">{label}</div>
-      </div>
-      <div class="kpi-value">{val}</div>
-      {sub_html}
-      {spark_html}
-      </div>""", unsafe_allow_html=True)
+    html = (
+        f'<div class="kpi-card">'
+        f'<div class="kpi-top">'
+        f'<div class="kpi-icon" style="background:{color}1a;color:{color};">{icon}</div>'
+        f'<div class="kpi-label">{label}</div>'
+        f'</div>'
+        f'<div class="kpi-value">{val}</div>'
+        f'{sub_html}{spark_html}'
+        f'</div>'
+    )
+    col.markdown(html, unsafe_allow_html=True)
 
 def fmt_compact(value):
     """Format a euro amount compactly, e.g. 1990000 -> '1.99 M', 374400 -> '374.4 K'."""
