@@ -698,6 +698,35 @@ with tab_overview:
                                     font=dict(size=15, color=bal_color, family="Inter"), showarrow=False)])
             st.plotly_chart(figA2, use_container_width=True, theme=None)
 
+    with st.container(border=True):
+        sec("🏆","Which Fixation Wins or Loses the Most?", "Ranked by net LME Balance across the current selection")
+        rank_df = view_fix.groupby("Fixation")["LME_Balance_Eur"].sum().reset_index().sort_values("LME_Balance_Eur")
+        rank_df["Rank"] = range(len(rank_df), 0, -1)
+        figRank = go.Figure(go.Bar(
+            x=rank_df["LME_Balance_Eur"], y=rank_df["Fixation"], orientation="h",
+            marker_color=[TEAL if v >= 0 else ROSE for v in rank_df["LME_Balance_Eur"]],
+            text=[f"€{v:,.0f}" for v in rank_df["LME_Balance_Eur"]], textposition="outside"
+        ))
+        figRank.add_vline(x=0, line_color="#dde3f0")
+        alay(figRank, xaxis=dict(title="LME Balance (€)"), yaxis=dict(title=""))
+        st.plotly_chart(figRank, use_container_width=True, theme=None)
+        best_fix = rank_df.iloc[-1]
+        worst_fix = rank_df.iloc[0]
+        st.caption(f"🥇 **{best_fix['Fixation']}** contributes the most (€{best_fix['LME_Balance_Eur']:,.0f}) · "
+                   f"🥴 **{worst_fix['Fixation']}** drags the result down the most (€{worst_fix['LME_Balance_Eur']:,.0f})")
+
+    if len(sel_e) > 1:
+        with st.container(border=True):
+            sec("🌍","Kenitra vs Maroc — Fixation by Fixation", "Who performs better on which fixation?")
+            figEF = px.bar(view_fix.groupby(["Entity","Fixation"])["LME_Balance_Eur"].sum().reset_index(),
+                           x="Fixation", y="LME_Balance_Eur", color="Entity",
+                           barmode="group", text_auto=",.0f", color_discrete_map=ENT_COLOR)
+            figEF.add_hline(y=0, line_color="#dde3f0")
+            figEF.update_traces(textfont=dict(size=10, color=INK), textposition="outside")
+            alay(figEF, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
+                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(figEF, use_container_width=True, theme=None)
+
     if len(sel_e) > 1 or len(sel_m) > 1:
         with st.container(border=True):
             sec("🌍","Balance by Entity & Month", "Side-by-side comparison")
@@ -781,21 +810,30 @@ with tab_entity:
 
 # ─────────────────────────── TAB: BY FIXATION ───────────────────────────
 with tab_fixation:
+    with st.container(border=True):
+        sec("📈","How Has Each Fixation's Balance Evolved?", "Monthly LME Balance (€), one line per fixation")
+        fix_trend = (view_fix.groupby(["Fixation","MonthKey","Month"])["LME_Balance_Eur"]
+                     .sum().reset_index().sort_values("MonthKey"))
+        if fix_trend["MonthKey"].nunique() > 1:
+            figFT = px.line(fix_trend, x="Month", y="LME_Balance_Eur", color="Fixation",
+                            markers=True, category_orders={"Month": month_order},
+                            color_discrete_sequence=PALETTE)
+            figFT.update_traces(line=dict(width=3), marker=dict(size=8))
+            figFT.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
+            alay(figFT, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
+                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(figFT, use_container_width=True, theme=None)
+        else:
+            figFT = px.bar(fix_trend, x="Fixation", y="LME_Balance_Eur", color="Fixation",
+                           color_discrete_sequence=PALETTE, text_auto=",.0f")
+            figFT.add_hline(y=0, line_color="#dde3f0")
+            alay(figFT, showlegend=False, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
+            st.plotly_chart(figFT, use_container_width=True, theme=None)
+            st.caption("Add more monthly files to unlock the trend view.")
+
     rowB1, rowB2 = st.columns(2)
 
     with rowB1:
-        with st.container(border=True):
-            sec("📈","LME Balance by Fixation", "All entities/months combined")
-            figB1 = px.bar(view_fix, x="Fixation", y="LME_Balance_Eur", color="Group",
-                            barmode="group", text_auto=",.0f", color_discrete_sequence=PALETTE)
-            figB1.add_hline(y=0, line_color="#dde3f0")
-            figB1.update_traces(textfont=dict(size=10, color=INK), textposition="outside")
-            alay(figB1, showlegend=len(groups) > 1,
-                 yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
-                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-            st.plotly_chart(figB1, use_container_width=True, theme=None)
-
-    with rowB2:
         with st.container(border=True):
             sec("💰","Sales vs Valuation", "By fixation, aggregated across selection")
             melted = view_fix.groupby("Fixation")[["Sales_Value","Final_Value"]].sum().reset_index()
@@ -807,6 +845,27 @@ with tab_fixation:
             alay(figB2, barmode="group", xaxis=dict(title="Value (€)"), yaxis=dict(title=""),
                  legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(figB2, use_container_width=True, theme=None)
+
+    with rowB2:
+        with st.container(border=True):
+            sec("🔄","What Does Reallocation Cost or Bring?", "€ impact of quantity sourced from other fixations")
+            realloc = view_fix[view_fix["Allocated_QTE"].fillna(0) > 0].copy()
+            if not realloc.empty:
+                realloc["Realloc_Impact"] = realloc["Allocated_QTE"] * (realloc["LME_Sales"] - realloc["LME_Realloc"])
+                realloc_agg = realloc.groupby("Fixation")["Realloc_Impact"].sum().reset_index().sort_values("Realloc_Impact")
+                figRI = go.Figure(go.Bar(
+                    x=realloc_agg["Realloc_Impact"], y=realloc_agg["Fixation"], orientation="h",
+                    marker_color=[TEAL if v >= 0 else ROSE for v in realloc_agg["Realloc_Impact"]],
+                    text=[f"€{v:,.0f}" for v in realloc_agg["Realloc_Impact"]], textposition="outside"
+                ))
+                figRI.add_vline(x=0, line_color="#dde3f0")
+                alay(figRI, xaxis=dict(title="Reallocation Impact (€)"), yaxis=dict(title=""))
+                st.plotly_chart(figRI, use_container_width=True, theme=None)
+                st.caption("Positive = the reallocated quantity was sold above the price it was sourced at "
+                           "(favorable). Negative = it cost more than it was sold for (unfavorable).")
+            else:
+                st.info("No reallocation occurred for the current selection — every fixation's own stock "
+                        "and purchases fully covered its sales.")
 
     with st.container(border=True):
         sec("⚙️","Quantity Flow — Sold vs Available (same fixation)",
@@ -871,22 +930,6 @@ with tab_fixation:
                      subset=["LME Balance (€)","Balance per Ton (€/T)"]),
             use_container_width=True, hide_index=True, height=38*len(disp_fs)+40
         )
-
-        fix_trend = (view_fix.groupby(["Fixation","MonthKey","Month"])["LME_Balance_Eur"]
-                     .sum().reset_index().sort_values("MonthKey"))
-        if fix_trend["MonthKey"].nunique() > 1:
-            st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-            figFT = px.line(fix_trend, x="Month", y="LME_Balance_Eur", color="Fixation",
-                            markers=True, category_orders={"Month": month_order},
-                            color_discrete_sequence=PALETTE)
-            figFT.update_traces(line=dict(width=3), marker=dict(size=8))
-            figFT.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
-            alay(figFT, title="LME Balance (€) — Trend per Fixation",
-                 yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""),
-                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-            st.plotly_chart(figFT, use_container_width=True, theme=None)
-        else:
-            st.caption("Add more monthly files to unlock the per-fixation trend view.")
 
 # ─────────────────────────── TAB: GAINS & LOSSES ───────────────────────────
 with tab_gl:
