@@ -619,34 +619,39 @@ fixation's shortfall.
 """, unsafe_allow_html=True)
 
 # ══════════════════════ KPI ROW ══════════════════════
-tot_sales   = view_tot["Sales_Value"].sum()
-tot_final   = view_tot["Final_Value"].sum()
-tot_balance = view_tot["LME_Balance_Eur"].sum()
-tot_qty     = view_tot["Qty_Sold_T"].sum()
+# Aggregates are summed from the per-fixation rows (view_fix) rather than the TOTAL row,
+# so a file with a blank or shifted TOTAL line cannot silently under-count the figures.
+tot_sales   = view_fix["Sales_Value"].sum()
+tot_balance = view_fix["LME_Balance_Eur"].sum()
+tot_qty     = view_fix["Qty_Sold_T"].sum()
 bal_per_t   = tot_balance / tot_qty if tot_qty else 0
+bal_pct     = (tot_balance / tot_sales * 100) if tot_sales else 0
 bal_color   = TEAL if tot_balance >= 0 else ROSE
-n_fav       = (view_tot["LME_Balance_Eur"] >= 0).sum()
-n_tot       = len(view_tot)
 
-monthly = view_tot.groupby("MonthKey")[["Sales_Value","Final_Value","LME_Balance_Eur"]].sum().sort_index()
-spark_sales   = monthly["Sales_Value"].tolist()   if len(monthly) > 1 else None
-spark_final   = monthly["Final_Value"].tolist()   if len(monthly) > 1 else None
+grp_bal     = view_fix.groupby("Group")["LME_Balance_Eur"].sum()
+n_fav       = int((grp_bal >= 0).sum())
+n_tot       = int(len(grp_bal))
+
+monthly = view_fix.groupby("MonthKey")[["Sales_Value","LME_Balance_Eur","Qty_Sold_T"]].sum().sort_index()
 spark_balance = monthly["LME_Balance_Eur"].tolist() if len(monthly) > 1 else None
+spark_qty     = monthly["Qty_Sold_T"].tolist()      if len(monthly) > 1 else None
+spark_pct     = ((monthly["LME_Balance_Eur"] / monthly["Sales_Value"].replace(0, pd.NA) * 100)
+                 .fillna(0).tolist()) if len(monthly) > 1 else None
 
-sub_sales = "Total sold, valorized"
 sub_balance = "Favorable" if tot_balance >= 0 else "Unfavorable"
+sub_qty     = f"over {n_tot} entity × month"
 if len(monthly) > 1:
-    d_sales = monthly["Sales_Value"].iloc[-1] - monthly["Sales_Value"].iloc[-2]
-    d_bal   = monthly["LME_Balance_Eur"].iloc[-1] - monthly["LME_Balance_Eur"].iloc[-2]
-    sub_sales   = f"{'▲' if d_sales>=0 else '▼'} €{fmt_compact(abs(d_sales))} vs last month"
+    d_bal = monthly["LME_Balance_Eur"].iloc[-1] - monthly["LME_Balance_Eur"].iloc[-2]
+    d_qty = monthly["Qty_Sold_T"].iloc[-1] - monthly["Qty_Sold_T"].iloc[-2]
     sub_balance = f"{'▲' if d_bal>=0 else '▼'} €{fmt_compact(abs(d_bal))} vs last month"
+    sub_qty     = f"{'▲' if d_qty>=0 else '▼'} {abs(d_qty):,.0f} T vs last month"
 
-k1,k2,k3,k4,k5 = st.columns(5)
-kpi(k1,"💶","Sales Valuation",        f"€{tot_sales:,.0f}",   NAVY_MD, sub_sales, spark_sales)
-kpi(k2,"📦","Stock + Purchase Value", f"€{tot_final:,.0f}",   NAVY_LT, "FIFO cost basis", spark_final)
-kpi(k3,"⚖️","Net LME Balance",        f"€{tot_balance:,.0f}", bal_color, sub_balance, spark_balance)
-kpi(k4,"📏","Balance per Ton",        f"€{bal_per_t:,.1f}/T", GOLD, f"on {tot_qty:,.0f} T sold")
-kpi(k5,"✅","Favorable Periods",      f"{n_fav} / {n_tot}",   TEAL if n_fav==n_tot else ROSE, "entity × month")
+k1,k2,k3,k4 = st.columns(4)
+kpi(k1,"⚖️","Net LME Balance",   f"€{tot_balance:,.0f}", bal_color, sub_balance, spark_balance)
+kpi(k2,"📏","Balance per Ton",   f"€{bal_per_t:,.1f}/T", GOLD, f"on {tot_qty:,.0f} T sold")
+kpi(k3,"📦","Total Qty Sold",    f"{tot_qty:,.0f} T",    NAVY_MD, sub_qty, spark_qty)
+kpi(k4,"％","Balance % of Sales", f"{bal_pct:+.2f}%",     bal_color,
+    f"on €{fmt_compact(tot_sales)} of sales", spark_pct)
 
 
 
@@ -685,17 +690,17 @@ with tab_overview:
 
     with rowA2:
         with st.container(border=True):
-            sec("🥯","Valuation Split", "Sales vs cost basis")
-            donut_df = pd.DataFrame({"Component": ["Sales", "Stock + Purchase"], "Value": [tot_sales, tot_final]})
+            sec("🥯","How Many Periods Were Favorable?", "Each slice = one entity × month")
+            n_unfav = n_tot - n_fav
             figA2 = go.Figure(go.Pie(
-                labels=donut_df["Component"], values=donut_df["Value"], hole=0.62,
-                marker=dict(colors=[COPPER, NAVY_LT], line=dict(color="#ffffff", width=3)),
-                textinfo="percent", textfont=dict(color="#ffffff", size=12)
+                labels=["Favorable", "Unfavorable"], values=[n_fav, n_unfav], hole=0.62,
+                marker=dict(colors=[TEAL, ROSE], line=dict(color="#ffffff", width=3)),
+                textinfo="value", textfont=dict(color="#ffffff", size=13), sort=False
             ))
             alay(figA2, showlegend=True,
                  legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
-                 annotations=[dict(text=f"€{tot_sales - tot_final:+,.0f}", x=0.5, y=0.5,
-                                    font=dict(size=15, color=bal_color, family="Inter"), showarrow=False)])
+                 annotations=[dict(text=f"{n_fav}/{n_tot}", x=0.5, y=0.5,
+                                    font=dict(size=17, color=bal_color, family="Inter"), showarrow=False)])
             st.plotly_chart(figA2, use_container_width=True, theme=None)
 
     with st.container(border=True):
