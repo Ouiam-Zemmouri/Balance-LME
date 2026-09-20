@@ -202,15 +202,6 @@ div[data-testid="stVerticalBlockBorderWrapper"]{
 /* Dataframe */
 .stDataFrame{border-radius:12px;overflow:hidden;border:1px solid #e9edf5;}
 
-/* Gains/Losses dark cards */
-.gl-panel{background:#1c1f26;border-radius:16px;padding:22px 20px;}
-.gl-panel-title{color:#ffffff;font-size:1rem;font-weight:800;margin-bottom:16px;}
-.gl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;}
-.gl-card{background:#2a2e38;border-radius:12px;padding:18px 16px;text-align:center;}
-.gl-card-label{color:#9aa0ad;font-size:0.75rem;font-weight:500;margin-bottom:8px;}
-.gl-card-value{color:#ffffff;font-size:1.6rem;font-weight:800;line-height:1.15;}
-.gl-card-delta{font-size:0.85rem;font-weight:700;margin-top:8px;}
-
 ::-webkit-scrollbar{width:6px;height:6px;}
 ::-webkit-scrollbar-track{background:#f4f6fb;}
 ::-webkit-scrollbar-thumb{background:#c7d1e3;border-radius:6px;}
@@ -705,8 +696,8 @@ kpi(k4,"％","Balance % of Sales", f"{bal_pct:+.2f}%",     bal_color,
 st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
 # ══════════════════════ MAIN TABS ══════════════════════
-tab_overview, tab_entity, tab_fixation, tab_gl, tab_insights, tab_data = st.tabs(
-    ["📊 Overview", "🏭 By Entity", "🔍 By Fixation", "💹 Gains & Losses", "🧠 Insights", "📋 Data"]
+tab_overview, tab_entity, tab_fixation, tab_insights, tab_data = st.tabs(
+    ["📊 Overview", "🏭 By Entity", "🔍 By Fixation", "🧠 Insights", "📋 Data"]
 )
 
 # ─────────────────────────── TAB: OVERVIEW ───────────────────────────
@@ -857,20 +848,15 @@ with tab_entity:
             continue
 
         e_sales = ent_tot["Sales_Value"].sum()
-        e_final = ent_tot["Final_Value"].sum()
         e_bal   = ent_tot["LME_Balance_Eur"].sum()
-        e_qty   = ent_tot["Qty_Sold_T"].sum()
-        e_per_t = e_bal / e_qty if e_qty else 0
         e_color = TEAL if e_bal >= 0 else ROSE
 
         with st.container(border=True):
             sec("🏭", entity, f"{ent_fix['MonthKey'].nunique()} month(s) in current selection")
 
-            c1,c2,c3,c4 = st.columns(4)
+            c1,c2 = st.columns(2)
             kpi(c1,"💶","Sales Valuation",  f"€{fmt_compact(e_sales)}", NAVY_MD)
-            kpi(c2,"📦","Stock + Purchase", f"€{fmt_compact(e_final)}", NAVY_LT)
-            kpi(c3,"⚖️","Net Balance",      f"€{fmt_compact(e_bal)}",   e_color)
-            kpi(c4,"📏","Balance per Ton",  f"€{e_per_t:,.1f}/T",       GOLD)
+            kpi(c2,"⚖️","Net Balance",      f"€{fmt_compact(e_bal)}",   e_color)
 
             st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
 
@@ -939,41 +925,17 @@ with tab_fixation:
             st.plotly_chart(figFT, use_container_width=True, theme=None)
             st.caption("Add more monthly files to unlock the trend view.")
 
-    rowB1, rowB2 = st.columns(2)
-
-    with rowB1:
-        with st.container(border=True):
-            sec("💰","Sales vs Valuation", "By fixation, aggregated across selection")
-            melted = view_fix.groupby("Fixation")[["Sales_Value","Final_Value"]].sum().reset_index()
-            figB2 = go.Figure()
-            figB2.add_trace(go.Bar(name="Sales", y=melted["Fixation"], x=melted["Sales_Value"],
-                                    orientation="h", marker_color=COPPER))
-            figB2.add_trace(go.Bar(name="Stock+Purchase", y=melted["Fixation"], x=melted["Final_Value"],
-                                    orientation="h", marker_color=NAVY_LT))
-            alay(figB2, barmode="group", xaxis=dict(title="Value (€)"), yaxis=dict(title=""),
-                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-            st.plotly_chart(figB2, use_container_width=True, theme=None)
-
-    with rowB2:
-        with st.container(border=True):
-            sec("🔄","What Does Reallocation Cost or Bring?", "€ impact of quantity sourced from other fixations")
-            realloc = view_fix[view_fix["Allocated_QTE"].fillna(0) > 0].copy()
-            if not realloc.empty:
-                realloc["Realloc_Impact"] = realloc["Allocated_QTE"] * (realloc["LME_Sales"] - realloc["LME_Realloc"])
-                realloc_agg = realloc.groupby("Fixation")["Realloc_Impact"].sum().reset_index().sort_values("Realloc_Impact")
-                figRI = go.Figure(go.Bar(
-                    x=realloc_agg["Realloc_Impact"], y=realloc_agg["Fixation"], orientation="h",
-                    marker_color=[TEAL if v >= 0 else ROSE for v in realloc_agg["Realloc_Impact"]],
-                    text=[f"€{v:,.0f}" for v in realloc_agg["Realloc_Impact"]], textposition="outside"
-                ))
-                figRI.add_vline(x=0, line_color="#dde3f0")
-                alay(figRI, xaxis=dict(title="Reallocation Impact (€)"), yaxis=dict(title=""))
-                st.plotly_chart(figRI, use_container_width=True, theme=None)
-                st.caption("Positive = the reallocated quantity was sold above the price it was sourced at "
-                           "(favorable). Negative = it cost more than it was sold for (unfavorable).")
-            else:
-                st.info("No reallocation occurred for the current selection — every fixation's own stock "
-                        "and purchases fully covered its sales.")
+    with st.container(border=True):
+        sec("💰","Sales vs Valuation", "By fixation, aggregated across selection")
+        melted = view_fix.groupby("Fixation")[["Sales_Value","Final_Value"]].sum().reset_index()
+        figB2 = go.Figure()
+        figB2.add_trace(go.Bar(name="Sales", y=melted["Fixation"], x=melted["Sales_Value"],
+                                orientation="h", marker_color=COPPER))
+        figB2.add_trace(go.Bar(name="Stock+Purchase", y=melted["Fixation"], x=melted["Final_Value"],
+                                orientation="h", marker_color=NAVY_LT))
+        alay(figB2, barmode="group", xaxis=dict(title="Value (€)"), yaxis=dict(title=""),
+             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        st.plotly_chart(figB2, use_container_width=True, theme=None)
 
     with st.container(border=True):
         sec("⚙️","Quantity Flow — Sold vs Available (same fixation)",
@@ -1038,73 +1000,6 @@ with tab_fixation:
                      subset=["LME Balance (€)","Balance per Ton (€/T)"]),
             use_container_width=True, hide_index=True, height=38*len(disp_fs)+40
         )
-
-# ─────────────────────────── TAB: GAINS & LOSSES ───────────────────────────
-with tab_gl:
-    gl_cards = []
-    for g in groups:
-        sub_tot = view_tot[view_tot["Group"] == g]
-        g_bal = sub_tot["LME_Balance_Eur"].sum()
-        g_qty = sub_tot["Qty_Sold_T"].sum()
-        g_per_t = g_bal / g_qty if g_qty else 0
-        is_gain = g_bal >= 0
-        arrow = "▲" if is_gain else "▼"
-        delta_color = "#3ddc97" if is_gain else "#ff6b6b"
-        gl_cards.append(f"""
-          <div class="gl-card">
-            <div class="gl-card-label">{g}</div>
-            <div class="gl-card-value">€{fmt_compact(g_bal)}</div>
-            <div class="gl-card-delta" style="color:{delta_color};">{arrow} €{fmt_compact(g_per_t)}/T</div>
-          </div>""")
-
-    st.markdown(f"""<div class="gl-panel">
-      <div class="gl-panel-title">💹 Gains / Losses — LME Balance Result</div>
-      <div class="gl-grid">{''.join(gl_cards)}</div>
-    </div>""", unsafe_allow_html=True)
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
-    fix_gl_cards = []
-    fix_agg = view_fix.groupby("Fixation")[["LME_Balance_Eur","Qty_Sold_T"]].sum().reset_index()
-    for _, row in fix_agg.iterrows():
-        f_bal = row["LME_Balance_Eur"]
-        f_qty = row["Qty_Sold_T"]
-        f_per_t = f_bal / f_qty if f_qty else 0
-        is_gain = f_bal >= 0
-        arrow = "▲" if is_gain else "▼"
-        delta_color = "#3ddc97" if is_gain else "#ff6b6b"
-        fix_gl_cards.append(f"""
-          <div class="gl-card">
-            <div class="gl-card-label">{row['Fixation']}</div>
-            <div class="gl-card-value">€{fmt_compact(f_bal)}</div>
-            <div class="gl-card-delta" style="color:{delta_color};">{arrow} €{fmt_compact(f_per_t)}/T</div>
-          </div>""")
-
-    st.markdown(f"""<div class="gl-panel">
-      <div class="gl-panel-title">💹 Gains / Losses — by Fixation</div>
-      <div class="gl-grid">{''.join(fix_gl_cards)}</div>
-    </div>""", unsafe_allow_html=True)
-
-    if len(sel_e) > 1:
-        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-        ent_gl_cards = []
-        for entity in sorted(sel_e):
-            ent_tot = view_tot[view_tot["Entity"] == entity]
-            en_bal = ent_tot["LME_Balance_Eur"].sum()
-            en_qty = ent_tot["Qty_Sold_T"].sum()
-            en_per_t = en_bal / en_qty if en_qty else 0
-            is_gain = en_bal >= 0
-            arrow = "▲" if is_gain else "▼"
-            delta_color = "#3ddc97" if is_gain else "#ff6b6b"
-            ent_gl_cards.append(f"""
-              <div class="gl-card">
-                <div class="gl-card-label">{entity}</div>
-                <div class="gl-card-value">€{fmt_compact(en_bal)}</div>
-                <div class="gl-card-delta" style="color:{delta_color};">{arrow} €{fmt_compact(en_per_t)}/T</div>
-              </div>""")
-        st.markdown(f"""<div class="gl-panel">
-          <div class="gl-panel-title">💹 Gains / Losses — by Entity</div>
-          <div class="gl-grid">{''.join(ent_gl_cards)}</div>
-        </div>""", unsafe_allow_html=True)
 
 # ─────────────────────────── TAB: INSIGHTS ───────────────────────────
 with tab_insights:
