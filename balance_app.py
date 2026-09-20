@@ -389,6 +389,26 @@ def load_all_balance_files():
         return pd.DataFrame(), errs
     return pd.concat(dfs, ignore_index=True), errs
 
+def find_realloc_sources(view_fix):
+    """For each row that needed reallocation (Allocated_QTE > 0), identify which other
+    fixation (same entity + month) actually supplied it, by matching the reallocation
+    price (LME_Realloc) against that fixation's own Stock/Purchase LME price."""
+    sources = {}  # deficit fixation -> set of source fixation names
+    tol = 1e-3
+    for (entity, month_key), g in view_fix.groupby(["Entity", "MonthKey"]):
+        for _, row in g.iterrows():
+            realloc_price = row.get("LME_Realloc")
+            alloc_qty = row.get("Allocated_QTE")
+            if pd.isna(realloc_price) or not alloc_qty or alloc_qty <= 0:
+                continue
+            for _, cand in g[g["Fixation"] != row["Fixation"]].iterrows():
+                for price_col in ["LME_Stock", "LME_Purchase"]:
+                    cp = cand.get(price_col)
+                    if pd.notna(cp) and abs(cp - realloc_price) < tol:
+                        sources.setdefault(row["Fixation"], set()).add(cand["Fixation"])
+                        break
+    return sources
+
 def generate_balance_insights(view_fix, view_tot):
     insights = []
     if view_fix.empty or view_tot.empty:
@@ -416,15 +436,15 @@ def generate_balance_insights(view_fix, view_tot):
 
     ne = view_fix.dropna(subset=["Needs_Exceed_T"])
     deficits = ne[ne["Needs_Exceed_T"] > 0.5]
-    surplus  = ne[ne["Needs_Exceed_T"] < -0.5]
     if not deficits.empty:
         d = deficits.iloc[0]
-        if not surplus.empty:
-            s = surplus.iloc[0]
+        realloc_sources = find_realloc_sources(view_fix)
+        srcs = realloc_sources.get(d["Fixation"])
+        if srcs:
+            src_txt = " and ".join(f"**{s}**" for s in sorted(srcs))
             insights.append(
                 f"Sold quantities on **{d['Fixation']}** exceeded available stock and purchases by "
-                f"**{d['Needs_Exceed_T']:.1f} T**; under FIFO this shortfall is reallocated from the "
-                f"surplus fixation **{s['Fixation']}**."
+                f"**{d['Needs_Exceed_T']:.1f} T**; under FIFO this shortfall is reallocated from {src_txt}."
             )
         else:
             insights.append(
@@ -949,10 +969,16 @@ with tab_fixation:
         alay(figQF, barmode="group", yaxis=dict(title="Quantity (T)"), xaxis=dict(title=""),
              legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(figQF, use_container_width=True, theme=None)
+        realloc_sources = find_realloc_sources(view_fix)
         gap_notes = []
         for _, r in qty_flow.iterrows():
             if r["Needs_Exceed_T"] > 0.5:
-                gap_notes.append(f"**{r['Fixation']}** needed **{r['Needs_Exceed_T']:.1f} T** more than its own stock + purchases — reallocated from another fixation.")
+                srcs = realloc_sources.get(r["Fixation"])
+                if srcs:
+                    src_txt = " and ".join(f"**{s}**" for s in sorted(srcs))
+                    gap_notes.append(f"**{r['Fixation']}** needed **{r['Needs_Exceed_T']:.1f} T** more than its own stock + purchases — reallocated from {src_txt}.")
+                else:
+                    gap_notes.append(f"**{r['Fixation']}** needed **{r['Needs_Exceed_T']:.1f} T** more than its own stock + purchases — reallocated from another fixation.")
         if gap_notes:
             st.caption(" · ".join(gap_notes))
         else:
