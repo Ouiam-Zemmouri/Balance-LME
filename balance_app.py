@@ -684,11 +684,10 @@ st.markdown(f"""<div class="impact-banner" style="background:{impact_bg};">
   </div>
 </div>""", unsafe_allow_html=True)
 
-k1,k2,k3,k4 = st.columns(4)
+k1,k2,k3 = st.columns(3)
 kpi(k1,"⚖️","Net LME Balance",   f"€{tot_balance:,.0f}", bal_color, sub_balance, spark_balance)
-kpi(k2,"📏","Balance per Ton",   f"€{bal_per_t:,.1f}/T", GOLD, f"on {tot_qty:,.0f} T sold")
-kpi(k3,"📦","Total Qty Sold",    f"{tot_qty:,.0f} T",    NAVY_MD, sub_qty, spark_qty)
-kpi(k4,"％","Balance % of Sales", f"{bal_pct:+.2f}%",     bal_color,
+kpi(k2,"📦","Total Qty Sold",    f"{tot_qty:,.0f} T",    NAVY_MD, sub_qty, spark_qty)
+kpi(k3,"％","Balance % of Sales", f"{bal_pct:+.2f}%",     bal_color,
     f"on €{fmt_compact(tot_sales)} of sales", spark_pct)
 
 
