@@ -698,7 +698,7 @@ with tab_overview:
 
     with rowA2:
         with st.container(border=True):
-            sec("🥯","How Many Periods Were Favorable?", "Click a slice to see which entity × month")
+            sec("🥯","How Many Periods Were Favorable?", "Click a button below to see which entity × month")
             n_unfav = n_tot - n_fav
             figA2 = go.Figure(go.Pie(
                 labels=["Favorable", "Unfavorable"], values=[n_fav, n_unfav], hole=0.62,
@@ -709,19 +709,22 @@ with tab_overview:
                  legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
                  annotations=[dict(text=f"{n_fav}/{n_tot}", x=0.5, y=0.5,
                                     font=dict(size=17, color=bal_color, family="Inter"), showarrow=False)])
-            donut_event = st.plotly_chart(figA2, use_container_width=True, theme=None,
-                                           on_select="rerun", selection_mode="points", key="fav_donut")
+            st.plotly_chart(figA2, use_container_width=True, theme=None)
 
-    donut_points = (donut_event.get("selection", {}) or {}).get("points", []) if donut_event else []
-    sel_label = donut_points[0].get("label") if donut_points else None
+            bc1, bc2 = st.columns(2)
+            if bc1.button(f"✅ Favorable ({n_fav})", use_container_width=True, key="btn_fav"):
+                st.session_state["fav_filter"] = None if st.session_state.get("fav_filter") == "Favorable" else "Favorable"
+            if bc2.button(f"⚠️ Unfavorable ({n_unfav})", use_container_width=True, key="btn_unfav"):
+                st.session_state["fav_filter"] = None if st.session_state.get("fav_filter") == "Unfavorable" else "Unfavorable"
 
+    sel_label = st.session_state.get("fav_filter")
     if sel_label in ("Favorable", "Unfavorable"):
         want_fav = (sel_label == "Favorable")
         matches = grp_bal[grp_bal >= 0] if want_fav else grp_bal[grp_bal < 0]
         matches = matches.sort_values(ascending=not want_fav)
         with st.container(border=True):
             icon = "✅" if want_fav else "⚠️"
-            sec(icon, f"{sel_label} periods — {len(matches)} entity × month", "Click the other slice to switch, or click the same slice again to clear")
+            sec(icon, f"{sel_label} periods — {len(matches)} entity × month", "Click the same button again to hide this")
             detail = matches.reset_index()
             detail.columns = ["Entity × Month", "LME Balance (€)"]
             st.dataframe(
