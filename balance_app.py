@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+from plotly.subplots import make_subplots
 import glob
 import os
 import re
@@ -136,6 +137,18 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;}
   background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);
   border-radius:20px;padding:6px 16px;color:#e8eefc;font-size:0.76rem;font-weight:600;
 }
+
+/* Copper impact headline */
+.impact-banner{
+  border-radius:16px;padding:22px 30px;margin-bottom:18px;
+  display:flex;align-items:center;gap:22px;flex-wrap:wrap;
+  box-shadow:0 6px 22px rgba(20,35,70,0.10);
+}
+.impact-banner .impact-icon{font-size:2.4rem;line-height:1;}
+.impact-banner .impact-text{flex:1;min-width:260px;}
+.impact-banner .impact-headline{font-size:1.15rem;font-weight:800;line-height:1.35;}
+.impact-banner .impact-headline .impact-amount{font-size:1.4rem;}
+.impact-banner .impact-sub{font-size:0.82rem;margin-top:4px;opacity:0.85;}
 
 /* KPI cards */
 .kpi-card{
@@ -654,6 +667,32 @@ if len(monthly) > 1:
     sub_balance = f"{'▲' if d_bal>=0 else '▼'} €{fmt_compact(abs(d_bal))} vs last month"
     sub_qty     = f"{'▲' if d_qty>=0 else '▼'} {abs(d_qty):,.0f} T vs last month"
 
+# ── Copper impact headline (€ amount, not %) ──
+is_pos = tot_balance >= 0
+impact_bg   = "linear-gradient(120deg,#e6f7f4 0%,#d7f2ec 100%)" if is_pos else "linear-gradient(120deg,#fdecee 0%,#fbdfe3 100%)"
+impact_txt  = "#0d9488" if is_pos else "#e11d48"
+impact_icon = "📈" if is_pos else "📉"
+verb        = "added" if is_pos else "cost"
+period_lbl  = ", ".join(sel_m) if len(sel_m) <= 3 else f"the {len(sel_m)} selected months"
+top_fix_row = view_fix.groupby("Fixation")["LME_Balance_Eur"].sum().reset_index()
+top_fix_row = top_fix_row.reindex(top_fix_row["LME_Balance_Eur"].abs().sort_values(ascending=False).index)
+top_fix = top_fix_row.iloc[0]["Fixation"] if not top_fix_row.empty else "—"
+top_ent_row = view_fix.groupby("Entity")["LME_Balance_Eur"].sum().reset_index()
+top_ent_row = top_ent_row.reindex(top_ent_row["LME_Balance_Eur"].abs().sort_values(ascending=False).index)
+top_ent = top_ent_row.iloc[0]["Entity"] if not top_ent_row.empty else "—"
+
+st.markdown(f"""<div class="impact-banner" style="background:{impact_bg};">
+  <div class="impact-icon">{impact_icon}</div>
+  <div class="impact-text">
+    <div class="impact-headline" style="color:{impact_txt};">
+      Copper price movements {verb} <span class="impact-amount">€{abs(tot_balance):,.0f}</span> to revenue over {period_lbl}
+    </div>
+    <div class="impact-sub" style="color:{impact_txt};">
+      Mainly driven by <strong>{top_fix}</strong> at <strong>{top_ent}</strong> · {tot_qty:,.0f} T sold in total
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
+
 k1,k2,k3,k4 = st.columns(4)
 kpi(k1,"⚖️","Net LME Balance",   f"€{tot_balance:,.0f}", bal_color, sub_balance, spark_balance)
 kpi(k2,"📏","Balance per Ton",   f"€{bal_per_t:,.1f}/T", GOLD, f"on {tot_qty:,.0f} T sold")
@@ -672,6 +711,38 @@ tab_overview, tab_entity, tab_fixation, tab_gl, tab_insights, tab_data = st.tabs
 
 # ─────────────────────────── TAB: OVERVIEW ───────────────────────────
 with tab_overview:
+    with st.container(border=True):
+        sec("🔶","Copper Price vs. LME Balance", "How movements in the copper price line up with the resulting gain/loss")
+        cp_monthly = view_fix.groupby(["MonthKey","Month"]).apply(
+            lambda g: pd.Series({
+                "Avg_LME_Price": (g["Qty_Sold_T"] * g["LME_Sales"]).sum() / g["Qty_Sold_T"].sum() if g["Qty_Sold_T"].sum() else 0,
+                "LME_Balance_Eur": g["LME_Balance_Eur"].sum(),
+            })
+        ).reset_index().sort_values("MonthKey")
+
+        if len(cp_monthly) > 1:
+            figCP = make_subplots(specs=[[{"secondary_y": True}]])
+            figCP.add_trace(go.Bar(
+                x=cp_monthly["Month"], y=cp_monthly["LME_Balance_Eur"], name="LME Balance (€)",
+                marker_color=[TEAL if v >= 0 else ROSE for v in cp_monthly["LME_Balance_Eur"]],
+                opacity=0.75
+            ), secondary_y=False)
+            figCP.add_trace(go.Scatter(
+                x=cp_monthly["Month"], y=cp_monthly["Avg_LME_Price"], name="Avg Copper Price (€/kg)",
+                mode="lines+markers", line=dict(color=COPPER, width=3), marker=dict(size=9)
+            ), secondary_y=True)
+            figCP.update_layout(**LAY)
+            figCP.update_yaxes(title_text="LME Balance (€)", secondary_y=False, gridcolor="#f0f2f8")
+            figCP.update_yaxes(title_text="Avg Copper Price (€/kg)", secondary_y=True, showgrid=False)
+            figCP.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(figCP, use_container_width=True, theme=None)
+            st.caption("Bars = net LME Balance (€, left axis) · Line = average copper sales price (€/kg, right axis)")
+        else:
+            cp_row = cp_monthly.iloc[0] if not cp_monthly.empty else None
+            if cp_row is not None:
+                st.metric("Avg Copper Price this period (€/kg)", f"{cp_row['Avg_LME_Price']:.4f}")
+            st.caption("Add more monthly files to see how the copper price and the balance move together over time.")
+
     rowA1, rowA2 = st.columns([2,1])
 
     with rowA1:
