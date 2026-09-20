@@ -119,9 +119,17 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;}
   display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
   box-shadow:0 8px 28px rgba(20,35,70,0.18);
 }
-.title-banner h1{
+.title-banner h1, .title-banner .banner-title{
   font-size:1.65rem;font-weight:800;letter-spacing:1px;margin:0;color:#ffffff;
 }
+/* The broad safety-net rule above repaints every descendant dark. Streamlit wraps heading
+   text in a child element, so the banner needs its colors restated on descendants too. */
+.title-banner .banner-title, .title-banner .banner-title *,
+.title-banner h1, .title-banner h1 *{color:#ffffff !important;}
+.title-banner .banner-sub, .title-banner .banner-sub *,
+.title-banner p, .title-banner p *{color:#a8c0e8 !important;}
+.title-banner .banner-sub{font-size:0.82rem;margin:4px 0 0 0;letter-spacing:0.5px;}
+.title-banner .badge, .title-banner .badge *{color:#e8eefc !important;}
 .title-banner p{color:#a8c0e8;font-size:0.82rem;margin:4px 0 0 0;letter-spacing:0.5px;}
 .badge-strip{display:flex;gap:10px;flex-wrap:wrap;}
 .badge{
@@ -453,7 +461,7 @@ for e in errors:
 
 if bal_all.empty:
     st.markdown("""<div class="title-banner">
-      <div><h1 style="color:#ffffff !important;">⚖️ Balance LME</h1><p style="color:#a8c0e8 !important;">FIFO Method · Sales vs Stock &amp; Purchase Valuation</p></div>
+      <div><div class="banner-title">⚖️ Balance LME</div><div class="banner-sub">FIFO Method · Sales vs Stock &amp; Purchase Valuation</div></div>
     </div>""", unsafe_allow_html=True)
     st.info(
         f"No balance files found yet. Add your monthly `.xlsx` files "
@@ -488,8 +496,8 @@ view_tot = view[view["Fixation"].str.upper() == "TOTAL"].copy()
 # ── HEADER BANNER ──
 st.markdown(f"""<div class="title-banner">
   <div>
-    <h1 style="color:#ffffff !important;">⚖️ Balance LME</h1>
-    <p style="color:#a8c0e8 !important;">FIFO Method · Sales vs Stock &amp; Purchase Valuation</p>
+    <div class="banner-title">⚖️ Balance LME</div>
+    <div class="banner-sub">FIFO Method · Sales vs Stock &amp; Purchase Valuation</div>
   </div>
   <div class="badge-strip">
     <div class="badge">🏭 {', '.join(sel_e) if len(sel_e)<=2 else f'{len(sel_e)} entities'}</div>
