@@ -486,10 +486,24 @@ def generate_balance_insights(view_fix, view_tot):
         )
     return insights
 # ── SIDEBAR ──
-LOGO_PATH = "coficab_logo.png"
+LOGO_CANDIDATES = [
+    "coficab_logo.png", "coficab_logo.PNG", "Coficab_logo.png",
+    "COFICAB.png", "Coficab.png", "coficab.png", "COFICAB.PNG",
+    "logo.png", "Logo.png", "LOGO.png",
+    "coficab_logo.jpg", "COFICAB.jpg", "coficab.jpg", "logo.jpg",
+]
+LOGO_PATH = next((p for p in LOGO_CANDIDATES if os.path.exists(p)), None)
+if LOGO_PATH is None:
+    # fall back to a case-insensitive scan of the repo root for anything containing "coficab" or "logo"
+    for f in glob.glob("*"):
+        if os.path.isfile(f) and f.lower().endswith((".png", ".jpg", ".jpeg")) and \
+           ("coficab" in f.lower() or "logo" in f.lower()):
+            LOGO_PATH = f
+            break
+
 with st.sidebar:
     st.markdown('<div class="sidebar-header">', unsafe_allow_html=True)
-    if os.path.exists(LOGO_PATH):
+    if LOGO_PATH:
         st.image(LOGO_PATH, width=180)
     else:
         st.markdown('<div style="font-size:1.05rem;font-weight:800;color:#16264a;">⚖️ COFICAB</div>',
