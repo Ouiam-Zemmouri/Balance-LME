@@ -182,13 +182,26 @@ div[data-testid="stVerticalBlockBorderWrapper"]{
   box-shadow:0 2px 10px rgba(20,35,70,0.04);
 }
 
-/* Filter pills (multiselect) */
-[data-baseweb="tag"]{
-  background:#eaf0fb !important;border:1px solid #c7d7f2 !important;
-  color:#1e3a6d !important;border-radius:8px !important;font-weight:600 !important;
+/* Filter pills (multiselect tags) — force brand colors regardless of Streamlit's internal DOM */
+span[data-baseweb="tag"], div[data-baseweb="tag"],
+[data-baseweb="tag"], [data-baseweb="tag"] *,
+[data-testid="stMultiSelect"] [data-baseweb="tag"]{
+  background-color:#eaf0fb !important;background:#eaf0fb !important;
+  border:1px solid #c7d7f2 !important;color:#1e3a6d !important;
+  border-radius:8px !important;font-weight:600 !important;
 }
+[data-baseweb="tag"] svg{fill:#1e3a6d !important;}
 .filter-label{color:#5b6478;font-size:0.68rem;font-weight:700;text-transform:uppercase;
   letter-spacing:1.5px;margin:14px 0 4px 0;}
+
+/* Sidebar summary card */
+.sidebar-summary{
+  background:#f4f6fb;border:1px solid #e9edf5;border-radius:10px;padding:10px 12px;
+}
+.sidebar-summary-row{
+  display:flex;align-items:center;gap:8px;color:#5b6478 !important;font-size:0.78rem;font-weight:500;
+  padding:3px 0;
+}
 
 /* Buttons */
 .stButton>button{
@@ -499,19 +512,38 @@ ENT_COLOR = entity_color_map(sorted(bal_all["Entity"].unique()))
 
 # ── FILTERS (sidebar) ──
 with st.sidebar:
-    st.markdown('<p class="filter-label">Entity</p>', unsafe_allow_html=True)
+    st.markdown('<p class="filter-label">🏭 Entity</p>', unsafe_allow_html=True)
     ent_opts = sorted(bal_all["Entity"].unique())
+    ec1, ec2 = st.columns(2)
+    if ec1.button("All", key="ent_all_btn", use_container_width=True):
+        st.session_state["bal_ent"] = ent_opts
+        st.rerun()
+    if ec2.button("None", key="ent_none_btn", use_container_width=True):
+        st.session_state["bal_ent"] = []
+        st.rerun()
     sel_e = st.multiselect("", ent_opts, default=ent_opts, key="bal_ent", label_visibility="collapsed")
 
-    st.markdown('<p class="filter-label">Month</p>', unsafe_allow_html=True)
+    st.markdown('<p class="filter-label">📅 Month</p>', unsafe_allow_html=True)
     month_map = bal_all[["MonthKey","Month"]].drop_duplicates().sort_values("MonthKey")
-    sel_m = st.multiselect("", month_map["Month"].tolist(), default=month_map["Month"].tolist(),
-                            key="bal_month", label_visibility="collapsed")
+    month_opts = month_map["Month"].tolist()
+    mc1, mc2 = st.columns(2)
+    if mc1.button("All", key="mon_all_btn", use_container_width=True):
+        st.session_state["bal_month"] = month_opts
+        st.rerun()
+    if mc2.button("None", key="mon_none_btn", use_container_width=True):
+        st.session_state["bal_month"] = []
+        st.rerun()
+    sel_m = st.multiselect("", month_opts, default=month_opts, key="bal_month", label_visibility="collapsed")
 
     st.markdown("---")
-    st.caption(f"📁 {bal_all['SourceFile'].nunique()} file(s) loaded")
-    st.caption(f"🏭 {bal_all['Entity'].nunique()} entit{'y' if bal_all['Entity'].nunique()==1 else 'ies'} · "
-               f"{bal_all['MonthKey'].nunique()} month(s)")
+    n_files = bal_all['SourceFile'].nunique()
+    n_ent   = bal_all['Entity'].nunique()
+    n_mon   = bal_all['MonthKey'].nunique()
+    st.markdown(f"""<div class="sidebar-summary">
+      <div class="sidebar-summary-row"><span>📁</span><span>{n_files} file{'s' if n_files!=1 else ''} loaded</span></div>
+      <div class="sidebar-summary-row"><span>🏭</span><span>{n_ent} entit{'y' if n_ent==1 else 'ies'}</span></div>
+      <div class="sidebar-summary-row"><span>📅</span><span>{n_mon} month{'s' if n_mon!=1 else ''} available</span></div>
+    </div>""", unsafe_allow_html=True)
 
 view = bal_all[bal_all["Entity"].isin(sel_e) & bal_all["Month"].isin(sel_m)].copy()
 view_fix = view[view["Fixation"].str.upper() != "TOTAL"].copy()
