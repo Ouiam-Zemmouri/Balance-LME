@@ -194,6 +194,10 @@ span[data-baseweb="tag"], div[data-baseweb="tag"],
 .filter-label{color:#5b6478;font-size:0.68rem;font-weight:700;text-transform:uppercase;
   letter-spacing:1.5px;margin:14px 0 4px 0;}
 
+/* Sidebar logo header */
+.sidebar-header{padding:4px 0 16px 0;}
+.sidebar-header-sub{color:#5b6478 !important;font-size:0.76rem;margin-top:8px;}
+
 /* Sidebar summary card */
 .sidebar-summary{
   background:#f4f6fb;border:1px solid #e9edf5;border-radius:10px;padding:10px 12px;
@@ -482,11 +486,16 @@ def generate_balance_insights(view_fix, view_tot):
         )
     return insights
 # ── SIDEBAR ──
+LOGO_PATH = "coficab_logo.png"
 with st.sidebar:
-    st.markdown("""<div style="padding:4px 0 10px 0;">
-      <div style="font-size:1.05rem;font-weight:800;color:#16264a;">⚖️ Balance LME</div>
-      <div style="font-size:0.78rem;color:#5b6478;margin-top:2px;">COFICAB Kenitra · COFICAB Maroc</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-header">', unsafe_allow_html=True)
+    if os.path.exists(LOGO_PATH):
+        st.image(LOGO_PATH, width=180)
+    else:
+        st.markdown('<div style="font-size:1.05rem;font-weight:800;color:#16264a;">⚖️ COFICAB</div>',
+                     unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-header-sub">Balance LME · Kenitra &amp; Maroc</div></div>',
+                 unsafe_allow_html=True)
     if st.button("🔄 Refresh Data", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
@@ -514,26 +523,14 @@ ENT_COLOR = entity_color_map(sorted(bal_all["Entity"].unique()))
 with st.sidebar:
     st.markdown('<p class="filter-label">🏭 Entity</p>', unsafe_allow_html=True)
     ent_opts = sorted(bal_all["Entity"].unique())
-    ec1, ec2 = st.columns(2)
-    if ec1.button("All", key="ent_all_btn", use_container_width=True):
-        st.session_state["bal_ent"] = ent_opts
-        st.rerun()
-    if ec2.button("None", key="ent_none_btn", use_container_width=True):
-        st.session_state["bal_ent"] = []
-        st.rerun()
-    sel_e = st.multiselect("", ent_opts, default=ent_opts, key="bal_ent", label_visibility="collapsed")
+    sel_e = st.pills("", ent_opts, selection_mode="multi", default=ent_opts,
+                      key="bal_ent", label_visibility="collapsed")
 
     st.markdown('<p class="filter-label">📅 Month</p>', unsafe_allow_html=True)
     month_map = bal_all[["MonthKey","Month"]].drop_duplicates().sort_values("MonthKey")
     month_opts = month_map["Month"].tolist()
-    mc1, mc2 = st.columns(2)
-    if mc1.button("All", key="mon_all_btn", use_container_width=True):
-        st.session_state["bal_month"] = month_opts
-        st.rerun()
-    if mc2.button("None", key="mon_none_btn", use_container_width=True):
-        st.session_state["bal_month"] = []
-        st.rerun()
-    sel_m = st.multiselect("", month_opts, default=month_opts, key="bal_month", label_visibility="collapsed")
+    sel_m = st.pills("", month_opts, selection_mode="multi", default=month_opts,
+                      key="bal_month", label_visibility="collapsed")
 
     st.markdown("---")
     n_files = bal_all['SourceFile'].nunique()
