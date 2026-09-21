@@ -225,10 +225,12 @@ span[data-baseweb="tag"], div[data-baseweb="tag"],
 .coverage-stat-lbl{font-size:0.62rem;color:#8993a8 !important;text-transform:uppercase;letter-spacing:0.5px;}
 
 /* Buttons */
-.stButton>button{
-  background:#1e3a6d;color:#ffffff;border-radius:9px;border:none;font-weight:600;
+.stButton>button, .stButton>button *{
+  background:#1e3a6d;color:#ffffff !important;border-radius:9px;border:none;font-weight:600;
 }
-.stButton>button:hover{background:#16264a;color:#ffffff;}
+.stButton>button:hover{background:#16264a;color:#ffffff !important;}
+[data-testid="stSidebar"] .stButton>button,
+[data-testid="stSidebar"] .stButton>button *{color:#ffffff !important;}
 
 /* Expander */
 .streamlit-expanderHeader{background:#ffffff;border-radius:10px;font-weight:600;color:#16264a;}
