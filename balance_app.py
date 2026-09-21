@@ -567,6 +567,7 @@ with st.sidebar:
     n_files = bal_all['SourceFile'].nunique()
     n_ent   = bal_all['Entity'].nunique()
     n_mon   = bal_all['MonthKey'].nunique()
+    latest_month = bal_all.loc[bal_all["MonthKey"].idxmax(), "Month"]
     cov_pct = min(n_mon / 12 * 100, 100)
     circumference = 301.6
     cov_offset = circumference * (1 - cov_pct / 100)
@@ -589,7 +590,7 @@ with st.sidebar:
         </div>
       </div>
       <div class="coverage-stats">
-        <div class="coverage-stat"><div class="coverage-stat-num">{n_files}</div><div class="coverage-stat-lbl">Files</div></div>
+        <div class="coverage-stat"><div class="coverage-stat-num">{latest_month}</div><div class="coverage-stat-lbl">Latest Month</div></div>
         <div class="coverage-stat"><div class="coverage-stat-num">{n_ent}</div><div class="coverage-stat-lbl">Entities</div></div>
       </div>
     </div>""", unsafe_allow_html=True)
