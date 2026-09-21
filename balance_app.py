@@ -198,14 +198,31 @@ span[data-baseweb="tag"], div[data-baseweb="tag"],
 .sidebar-header{padding:4px 0 16px 0;}
 .sidebar-header-sub{color:#5b6478 !important;font-size:0.76rem;margin-top:8px;}
 
-/* Sidebar summary card */
-.sidebar-summary{
-  background:#f4f6fb;border:1px solid #e9edf5;border-radius:10px;padding:10px 12px;
+/* Sidebar coverage gauge */
+.coverage-card{
+  background:linear-gradient(145deg,#f8f9fc 0%,#eef1f8 100%);
+  border:1px solid #e9edf5;border-radius:14px;padding:18px 14px;text-align:center;
 }
-.sidebar-summary-row{
-  display:flex;align-items:center;gap:8px;color:#5b6478 !important;font-size:0.78rem;font-weight:500;
-  padding:3px 0;
+.coverage-ring{position:relative;width:110px;height:110px;margin:0 auto;}
+.coverage-ring svg{transform:rotate(-90deg);}
+.coverage-ring .ring-bg{fill:none;stroke:#e9edf5;stroke-width:9;}
+.coverage-ring .ring-fill{
+  fill:none;stroke:url(#coverageGradient);stroke-width:9;stroke-linecap:round;
+  stroke-dasharray:301.6;
+  animation:ringFill 1.4s cubic-bezier(0.65,0,0.35,1) forwards;
 }
+@keyframes ringFill{from{stroke-dashoffset:301.6;}to{stroke-dashoffset:var(--offset);}}
+.coverage-center{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+.coverage-value{font-size:1.3rem;font-weight:800;color:#16264a !important;line-height:1;}
+.coverage-label{font-size:0.62rem;color:#8993a8 !important;text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
+.coverage-title{font-size:0.78rem;font-weight:700;color:#16264a !important;margin-bottom:10px;}
+.coverage-stats{display:flex;justify-content:center;gap:18px;margin-top:12px;}
+.coverage-stat{text-align:center;}
+.coverage-stat-num{font-size:1rem;font-weight:800;color:#16264a !important;}
+.coverage-stat-lbl{font-size:0.62rem;color:#8993a8 !important;text-transform:uppercase;letter-spacing:0.5px;}
 
 /* Buttons */
 .stButton>button{
@@ -550,10 +567,31 @@ with st.sidebar:
     n_files = bal_all['SourceFile'].nunique()
     n_ent   = bal_all['Entity'].nunique()
     n_mon   = bal_all['MonthKey'].nunique()
-    st.markdown(f"""<div class="sidebar-summary">
-      <div class="sidebar-summary-row"><span>📁</span><span>{n_files} file{'s' if n_files!=1 else ''} loaded</span></div>
-      <div class="sidebar-summary-row"><span>🏭</span><span>{n_ent} entit{'y' if n_ent==1 else 'ies'}</span></div>
-      <div class="sidebar-summary-row"><span>📅</span><span>{n_mon} month{'s' if n_mon!=1 else ''} available</span></div>
+    cov_pct = min(n_mon / 12 * 100, 100)
+    circumference = 301.6
+    cov_offset = circumference * (1 - cov_pct / 100)
+    st.markdown(f"""<div class="coverage-card">
+      <div class="coverage-title">📊 Data Coverage</div>
+      <div class="coverage-ring">
+        <svg width="110" height="110" viewBox="0 0 110 110">
+          <defs>
+            <linearGradient id="coverageGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#c2703d"/>
+              <stop offset="100%" stop-color="#1e3a6d"/>
+            </linearGradient>
+          </defs>
+          <circle class="ring-bg" cx="55" cy="55" r="48"/>
+          <circle class="ring-fill" cx="55" cy="55" r="48" style="--offset:{cov_offset}px;"/>
+        </svg>
+        <div class="coverage-center">
+          <div class="coverage-value">{n_mon}/12</div>
+          <div class="coverage-label">months</div>
+        </div>
+      </div>
+      <div class="coverage-stats">
+        <div class="coverage-stat"><div class="coverage-stat-num">{n_files}</div><div class="coverage-stat-lbl">Files</div></div>
+        <div class="coverage-stat"><div class="coverage-stat-num">{n_ent}</div><div class="coverage-stat-lbl">Entities</div></div>
+      </div>
     </div>""", unsafe_allow_html=True)
 
 view = bal_all[bal_all["Entity"].isin(sel_e) & bal_all["Month"].isin(sel_m)].copy()
