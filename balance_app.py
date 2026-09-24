@@ -842,6 +842,7 @@ with tab_overview:
         cp_monthly = view_fix.groupby(["MonthKey","Month"]).apply(
             lambda g: pd.Series({
                 "Avg_LME_Price": (g["Qty_Sold_T"] * g["LME_Sales"]).sum() / g["Qty_Sold_T"].sum() if g["Qty_Sold_T"].sum() else 0,
+                "Avg_Purchase_Price": (g["Qty_Purchase_T"] * g["LME_Purchase"]).sum() / g["Qty_Purchase_T"].sum() if g["Qty_Purchase_T"].sum() else None,
                 "LME_Balance_Eur": g["LME_Balance_Eur"].sum(),
             })
         ).reset_index().sort_values("MonthKey")
