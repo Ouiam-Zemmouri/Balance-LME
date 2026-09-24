@@ -855,15 +855,21 @@ with tab_overview:
                 opacity=0.75
             ), secondary_y=False)
             figCP.add_trace(go.Scatter(
-                x=cp_monthly["Month"], y=cp_monthly["Avg_LME_Price"], name="Avg Copper Price (€/kg)",
+                x=cp_monthly["Month"], y=cp_monthly["Avg_LME_Price"], name="Avg Sales Price (€/kg)",
                 mode="lines+markers", line=dict(color=COPPER, width=3), marker=dict(size=9)
             ), secondary_y=True)
+            pur = cp_monthly.dropna(subset=["Avg_Purchase_Price"])
+            if not pur.empty:
+                figCP.add_trace(go.Scatter(
+                    x=pur["Month"], y=pur["Avg_Purchase_Price"], name="Avg Purchase Price (€/kg)",
+                    mode="lines+markers", line=dict(color=NAVY_LT, width=3, dash="dot"), marker=dict(size=9, symbol="diamond")
+                ), secondary_y=True)
             figCP.update_layout(**LAY)
             figCP.update_yaxes(title_text="LME Balance (€)", secondary_y=False, gridcolor="#f0f2f8")
             figCP.update_yaxes(title_text="Avg Copper Price (€/kg)", secondary_y=True, showgrid=False)
             figCP.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(figCP, use_container_width=True, theme=None)
-            st.caption("Bars = net LME Balance (€, left axis) · Line = average copper sales price (€/kg, right axis)")
+            st.caption("Bars = net LME Balance (€, left axis) · Solid line = average sales price · Dotted line = average purchase price (€/kg, right axis)")
         else:
             cp_row = cp_monthly.iloc[0] if not cp_monthly.empty else None
             if cp_row is not None:
