@@ -852,7 +852,7 @@ with tab_overview:
             figCP.add_trace(go.Bar(
                 x=cp_monthly["Month"], y=cp_monthly["LME_Balance_Eur"], name="LME Balance (€)",
                 marker_color=[TEAL if v >= 0 else ROSE for v in cp_monthly["LME_Balance_Eur"]],
-                opacity=0.75
+                opacity=0.75, hovertemplate="€%{y:,.0f}<extra></extra>"
             ), secondary_y=False)
             figCP.add_trace(go.Scatter(
                 x=cp_monthly["Month"], y=cp_monthly["Avg_LME_Price"], name="Avg Sales Price (€/kg)",
@@ -878,7 +878,7 @@ with tab_overview:
                 st.metric("Avg Copper Price this period (€/kg)", f"{cp_row['Avg_LME_Price']:.4f}")
             st.caption("Add more monthly files to see how the copper price and the balance move together over time.")
 
-    rowA1, rowA2 = st.columns([2,1])
+    rowA1, rowA2 = st.columns([3,1])
 
     with rowA1:
         with st.container(border=True):
@@ -891,14 +891,14 @@ with tab_overview:
                                  color_discrete_map=ENT_COLOR)
                 figA1.update_traces(line=dict(width=3), marker=dict(size=9))
                 figA1.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
-                alay(figA1, showlegend=len(sel_e) > 1,
+                alay(figA1, showlegend=len(sel_e) > 1, height=520,
                      yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
                 st.plotly_chart(figA1, use_container_width=True, theme=None)
             else:
                 figA1 = px.bar(view_tot, x="Entity", y="LME_Balance_Eur", color="Entity",
                                 color_discrete_map=ENT_COLOR, text_auto=",.0f")
                 figA1.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
-                alay(figA1, showlegend=False, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
+                alay(figA1, showlegend=False, height=520, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
                 st.plotly_chart(figA1, use_container_width=True, theme=None)
                 st.caption("Add more monthly files to unlock the trend view.")
 
@@ -911,7 +911,7 @@ with tab_overview:
                 marker=dict(colors=[TEAL, ROSE], line=dict(color="#ffffff", width=3)),
                 textinfo="value", textfont=dict(color="#ffffff", size=13), sort=False
             ))
-            alay(figA2, showlegend=True,
+            alay(figA2, showlegend=True, height=520,
                  legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
                  annotations=[dict(text=f"{n_fav}/{n_tot}", x=0.5, y=0.5,
                                     font=dict(size=17, color=bal_color, family="Inter"), showarrow=False)])
