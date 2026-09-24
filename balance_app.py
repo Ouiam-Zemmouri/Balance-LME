@@ -1078,32 +1078,36 @@ with tab_insights:
         pos, neg = ins[ins["Bal"] > 0], ins[ins["Bal"] < 0]
 
         # ── Hero: the whole operation in three sentences + source-mix bar ──
-        l1 = (f'Out of every <b>100 T</b> sold, <b>{_pc(T_stock,T_src):.0f} T</b> came from stock, '
-              f'<b>{_pc(T_purch,T_src):.0f} T</b> from purchases and '
-              f'<b>{_pc(T_realloc,T_src):.0f} T</b> were pulled from another fixation.')
-        l2 = (f'Net result: <b>€{T_bal:,.0f}</b> — sales were valued <b>{abs(res_pct):.2f}% '
-              f'{"above" if T_bal >= 0 else "below"}</b> the FIFO cost, i.e. <b>{spread:+.4f} €/kg</b> sold.')
+        def _b(txt, color="#ffffff"):
+            return f'<span style="color:{color} !important;font-weight:800;">{txt}</span>'
+
+        l1 = (f'Out of every {_b("100 T")} sold, {_b(f"{_pc(T_stock,T_src):.0f} T")} came from stock, '
+              f'{_b(f"{_pc(T_purch,T_src):.0f} T")} from purchases and '
+              f'{_b(f"{_pc(T_realloc,T_src):.0f} T")} were pulled from another fixation.')
+        l2 = (f'Net result: {_b(f"€{T_bal:,.0f}")} — sales were valued {_b(f"{abs(res_pct):.2f}% " + ("above" if T_bal >= 0 else "below"))} '
+              f'the FIFO cost, i.e. {_b(f"{spread:+.4f} €/kg")} sold.')
         bits = []
         if not pos.empty:
             top = pos.loc[pos["Bal"].idxmax()]
-            bits.append(f'🏆 <b>{top["Fixation"]}</b> is the engine ({_pc(top["Bal"], pos["Bal"].sum()):.0f}% of all gains)')
+            bits.append(f'🏆 {_b(top["Fixation"])} is the engine ({_pc(top["Bal"], pos["Bal"].sum()):.0f}% of all gains)')
         if not neg.empty:
             worst = neg.loc[neg["Bal"].idxmin()]
-            bits.append(f'📉 <b>{worst["Fixation"]}</b> is the main drag ({_pc(-worst["Bal"], -neg["Bal"].sum()):.0f}% of all losses)')
+            bits.append(f'📉 {_b(worst["Fixation"])} is the main drag ({_pc(-worst["Bal"], -neg["Bal"].sum()):.0f}% of all losses)')
         l3 = " &nbsp;·&nbsp; ".join(bits)
         mix_bar = _stack_bar([("Stock", T_stock, NAVY_LT), ("Purchases", T_purch, TEAL),
                               ("Reallocation", T_realloc, GOLD)], 40)
         st.markdown(
             f'<div style="background:linear-gradient(120deg,{NAVY} 0%,{NAVY_MD} 100%);border-radius:18px;'
-            f'padding:26px 30px;color:#ffffff;box-shadow:0 8px 24px rgba(22,38,74,0.18);margin-bottom:14px;">'
-            f'<div style="font-size:0.72rem;letter-spacing:0.14em;font-weight:700;color:#9fb4dc;">THE OPERATION IN 30 SECONDS</div>'
-            f'<div style="font-size:1.12rem;line-height:1.6;margin:10px 0 4px 0;">{l1}</div>'
-            f'<div style="font-size:1.12rem;line-height:1.6;margin-bottom:4px;">{l2}</div>'
-            f'<div style="font-size:1.0rem;line-height:1.6;color:#dbe6f8;margin-bottom:16px;">{l3}</div>'
+            f'padding:26px 30px;box-shadow:0 8px 24px rgba(22,38,74,0.18);margin-bottom:14px;">'
+            f'<div style="font-size:0.72rem;letter-spacing:0.14em;font-weight:700;color:#9fb4dc !important;">THE OPERATION IN 30 SECONDS</div>'
+            f'<div style="font-size:1.12rem;line-height:1.6;margin:10px 0 4px 0;color:#ffffff !important;">{l1}</div>'
+            f'<div style="font-size:1.12rem;line-height:1.6;margin-bottom:4px;color:#ffffff !important;">{l2}</div>'
+            f'<div style="font-size:1.0rem;line-height:1.6;margin-bottom:16px;color:#dbe6f8 !important;">{l3}</div>'
             f'{mix_bar}'
-            f'<div style="font-size:0.75rem;color:#9fb4dc;margin-top:8px;">Origin of the copper valued against the tonnage sold '
+            f'<div style="font-size:0.75rem;margin-top:8px;color:#9fb4dc !important;">Origin of the copper valued against the tonnage sold '
             f'(FIFO order: own stock → own purchases → reallocation from another fixation)</div>'
             f'</div>', unsafe_allow_html=True)
+
 
         # ── 4 headline tiles ──
         t1, t2, t3, t4 = st.columns(4)
