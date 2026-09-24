@@ -856,13 +856,15 @@ with tab_overview:
             ), secondary_y=False)
             figCP.add_trace(go.Scatter(
                 x=cp_monthly["Month"], y=cp_monthly["Avg_LME_Price"], name="Avg Sales Price (€/kg)",
-                mode="lines+markers", line=dict(color=COPPER, width=3), marker=dict(size=9)
+                mode="lines+markers", line=dict(color=COPPER, width=3), marker=dict(size=9),
+                hovertemplate="%{y:.4f} €/kg<extra></extra>"
             ), secondary_y=True)
             pur = cp_monthly.dropna(subset=["Avg_Purchase_Price"])
             if not pur.empty:
                 figCP.add_trace(go.Scatter(
                     x=pur["Month"], y=pur["Avg_Purchase_Price"], name="Avg Purchase Price (€/kg)",
-                    mode="lines+markers", line=dict(color=NAVY_LT, width=3, dash="dot"), marker=dict(size=9, symbol="diamond")
+                    mode="lines+markers", line=dict(color=NAVY_LT, width=3, dash="dot"), marker=dict(size=9, symbol="diamond"),
+                    hovertemplate="%{y:.4f} €/kg<extra></extra>"
                 ), secondary_y=True)
             figCP.update_layout(**LAY)
             figCP.update_yaxes(title_text="LME Balance (€)", secondary_y=False, gridcolor="#f0f2f8")
