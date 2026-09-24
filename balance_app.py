@@ -892,6 +892,7 @@ with tab_overview:
                 figA1.update_traces(line=dict(width=3), marker=dict(size=9))
                 figA1.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
                 alay(figA1, showlegend=len(sel_e) > 1, height=520,
+                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None),
                      yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
                 st.plotly_chart(figA1, use_container_width=True, theme=None)
             else:
