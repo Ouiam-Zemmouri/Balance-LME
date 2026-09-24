@@ -455,65 +455,7 @@ def find_realloc_sources(view_fix):
                         break
     return sources
 
-def generate_balance_insights(view_fix, view_tot):
-    insights = []
-    if view_fix.empty or view_tot.empty:
-        return ["Not enough data to generate an analysis for the current selection."]
 
-    vf = view_fix.dropna(subset=["LME_Sales"])
-    if not vf.empty:
-        best = vf.loc[vf["LME_Sales"].idxmin()]
-        worst = vf.loc[vf["LME_Sales"].idxmax()]
-        if best["Fixation"] != worst["Fixation"]:
-            insights.append(
-                f"The most favorable sales fixation is **{best['Fixation']}** at "
-                f"**{best['LME_Sales']:.4f} €/kg**, while **{worst['Fixation']}** carries the "
-                f"highest sales price at **{worst['LME_Sales']:.4f} €/kg**."
-            )
-
-    vs = view_fix.dropna(subset=["Qty_Stock_T"])
-    vs = vs[vs["Qty_Stock_T"] > 0]
-    if not vs.empty:
-        top_stock = vs.loc[vs["Qty_Stock_T"].idxmax()]
-        insights.append(
-            f"**{top_stock['Fixation']}** carries the largest stock position at "
-            f"**{top_stock['Qty_Stock_T']:.1f} T**, making it the main buffer in the FIFO valuation chain."
-        )
-
-    ne = view_fix.dropna(subset=["Needs_Exceed_T"])
-    deficits = ne[ne["Needs_Exceed_T"] > 0.5]
-    if not deficits.empty:
-        d = deficits.iloc[0]
-        realloc_sources = find_realloc_sources(view_fix)
-        srcs = realloc_sources.get(d["Fixation"])
-        if srcs:
-            src_txt = " and ".join(f"**{s}**" for s in sorted(srcs))
-            insights.append(
-                f"Sold quantities on **{d['Fixation']}** exceeded available stock and purchases by "
-                f"**{d['Needs_Exceed_T']:.1f} T**; under FIFO this shortfall is reallocated from {src_txt}."
-            )
-        else:
-            insights.append(
-                f"Sold quantities on **{d['Fixation']}** exceeded available stock and purchases by "
-                f"**{d['Needs_Exceed_T']:.1f} T**, requiring reallocation from the next fixation in the FIFO sequence."
-            )
-
-    tot_balance = view_tot["LME_Balance_Eur"].sum()
-    direction = "favorable" if tot_balance >= 0 else "unfavorable"
-    insights.append(
-        f"The overall LME balance is **{direction}**, at **€{tot_balance:,.0f}** — sales were valued "
-        f"{'above' if tot_balance >= 0 else 'below'} the FIFO cost of stock and purchases consumed."
-    )
-
-    vb = view_fix.dropna(subset=["LME_Balance_Eur"])
-    if not vb.empty:
-        top_c = vb.reindex(vb["LME_Balance_Eur"].abs().sort_values(ascending=False).index).iloc[0]
-        sign = "gain" if top_c["LME_Balance_Eur"] >= 0 else "loss"
-        insights.append(
-            f"**{top_c['Fixation']}** is the largest single contributor to this result, driving a "
-            f"**{sign} of €{abs(top_c['LME_Balance_Eur']):,.0f}**."
-        )
-    return insights
 # ── SIDEBAR ──
 LOGO_CANDIDATES = [
     "coficab_logo.png", "coficab_logo.PNG", "Coficab_logo.png",
@@ -1091,19 +1033,177 @@ with tab_sales:
                     "No sales recorded for the current selection.", "sales")
 
 # ─────────────────────────── TAB: INSIGHTS ───────────────────────────
+def _pc(a, b):
+    return (a / b * 100) if b else 0.0
+
+def _rgba(hexc, alpha):
+    h = hexc.lstrip("#")
+    return f"rgba({int(h[0:2],16)},{int(h[2:4],16)},{int(h[4:6],16)},{alpha})"
+
+def _stack_bar(parts, height=34, show_text=True):
+    """100% stacked horizontal bar (pure HTML). parts = [(label, value, color), ...]"""
+    total = sum(v for _, v, _ in parts if v > 0)
+    if total <= 0:
+        return ""
+    segs = ""
+    for label, v, c in parts:
+        if v <= 0:
+            continue
+        p = v / total * 100
+        txt = f"{label} {p:.0f}%" if (show_text and p >= 9) else ""
+        segs += (f'<div style="width:{p:.2f}%;background:{c};color:#ffffff;display:flex;align-items:center;'
+                 f'justify-content:center;font-size:0.8rem;font-weight:700;white-space:nowrap;">{txt}</div>')
+    return (f'<div style="display:flex;height:{height}px;border-radius:{height//2}px;overflow:hidden;'
+            f'background:#e9edf5;">{segs}</div>')
+
 with tab_insights:
-    with st.container(border=True):
-        sec("🧠","Result Interpretation", "Auto-generated from the current selection")
-        if len(groups) == 1:
-            for line in generate_balance_insights(view_fix, view_tot):
-                st.markdown(f"- {line}")
-        else:
-            for g in groups:
-                with st.expander(f"📌 {g}", expanded=False):
-                    sub_fix = view_fix[view_fix["Group"] == g]
-                    sub_tot = view_tot[view_tot["Group"] == g]
-                    for line in generate_balance_insights(sub_fix, sub_tot):
-                        st.markdown(f"- {line}")
+    fx = view_fix.copy()
+    num_cols = ["Qty_Sold_T", "Qty_Stock_T", "Qty_Purchase_T", "Allocated_QTE",
+                "Sales_Value", "Final_Value", "LME_Balance_Eur"]
+    for c in num_cols:
+        fx[c] = pd.to_numeric(fx[c], errors="coerce").fillna(0)
+    ins = fx.groupby("Fixation")[num_cols].sum().reset_index().sort_values("Fixation")
+    ins.columns = ["Fixation", "Sold", "Stock", "Purch", "Realloc", "Sales", "Cost", "Bal"]
+    ins["Src"] = ins["Stock"] + ins["Purch"] + ins["Realloc"]
+
+    T_sold, T_stock, T_purch, T_realloc = ins["Sold"].sum(), ins["Stock"].sum(), ins["Purch"].sum(), ins["Realloc"].sum()
+    T_src, T_sales, T_bal = ins["Src"].sum(), ins["Sales"].sum(), ins["Bal"].sum()
+
+    if ins.empty or T_sold <= 0 or T_src <= 0:
+        st.info("Not enough data to build the insights for the current selection.")
+    else:
+        spread   = T_bal / (T_sold * 1000)
+        res_pct  = _pc(T_bal, T_sales)
+        res_col  = TEAL if T_bal >= 0 else ROSE
+        pos, neg = ins[ins["Bal"] > 0], ins[ins["Bal"] < 0]
+
+        # ── Hero: the whole operation in three sentences + source-mix bar ──
+        l1 = (f'Out of every <b>100 T</b> sold, <b>{_pc(T_stock,T_src):.0f} T</b> came from stock, '
+              f'<b>{_pc(T_purch,T_src):.0f} T</b> from purchases and '
+              f'<b>{_pc(T_realloc,T_src):.0f} T</b> were pulled from another fixation.')
+        l2 = (f'Net result: <b>€{T_bal:,.0f}</b> — sales were valued <b>{abs(res_pct):.2f}% '
+              f'{"above" if T_bal >= 0 else "below"}</b> the FIFO cost, i.e. <b>{spread:+.4f} €/kg</b> sold.')
+        bits = []
+        if not pos.empty:
+            top = pos.loc[pos["Bal"].idxmax()]
+            bits.append(f'🏆 <b>{top["Fixation"]}</b> is the engine ({_pc(top["Bal"], pos["Bal"].sum()):.0f}% of all gains)')
+        if not neg.empty:
+            worst = neg.loc[neg["Bal"].idxmin()]
+            bits.append(f'📉 <b>{worst["Fixation"]}</b> is the main drag ({_pc(-worst["Bal"], -neg["Bal"].sum()):.0f}% of all losses)')
+        l3 = " &nbsp;·&nbsp; ".join(bits)
+        mix_bar = _stack_bar([("Stock", T_stock, NAVY_LT), ("Purchases", T_purch, TEAL),
+                              ("Reallocation", T_realloc, GOLD)], 40)
+        st.markdown(
+            f'<div style="background:linear-gradient(120deg,{NAVY} 0%,{NAVY_MD} 100%);border-radius:18px;'
+            f'padding:26px 30px;color:#ffffff;box-shadow:0 8px 24px rgba(22,38,74,0.18);margin-bottom:14px;">'
+            f'<div style="font-size:0.72rem;letter-spacing:0.14em;font-weight:700;color:#9fb4dc;">THE OPERATION IN 30 SECONDS</div>'
+            f'<div style="font-size:1.12rem;line-height:1.6;margin:10px 0 4px 0;">{l1}</div>'
+            f'<div style="font-size:1.12rem;line-height:1.6;margin-bottom:4px;">{l2}</div>'
+            f'<div style="font-size:1.0rem;line-height:1.6;color:#dbe6f8;margin-bottom:16px;">{l3}</div>'
+            f'{mix_bar}'
+            f'<div style="font-size:0.75rem;color:#9fb4dc;margin-top:8px;">Origin of the copper valued against the tonnage sold '
+            f'(FIFO order: own stock → own purchases → reallocation from another fixation)</div>'
+            f'</div>', unsafe_allow_html=True)
+
+        # ── 4 headline tiles ──
+        t1, t2, t3, t4 = st.columns(4)
+        routes = find_realloc_sources(view_fix)
+        routes_txt = " · ".join(f"{' + '.join(sorted(s))} → {d}" for d, s in sorted(routes.items())) \
+                     if routes else "No cross-fixation borrowing"
+        kpi(t1, "🎯", "Own Coverage", f"{_pc(T_stock+T_purch, T_src):.0f}%", NAVY_LT,
+            "of tonnage covered by own stock & purchases")
+        kpi(t2, "🔁", "Reallocation Reliance", f"{_pc(T_realloc, T_src):.0f}%", GOLD, routes_txt)
+        kpi(t3, "📈", "Result vs Sales", f"{res_pct:+.2f}%", res_col, f"{spread:+.4f} €/kg sold")
+        kpi(t4, "✅", "Favorable Periods", f"{_pc(n_fav, n_tot):.0f}%", TEAL, f"{n_fav} of {n_tot} entity × month")
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+        # ── Flow (Sankey) + contribution (Waterfall) ──
+        fcol, wcol = st.columns([3, 2])
+        fix_names = list(ins["Fixation"])
+
+        with fcol:
+            with st.container(border=True):
+                sec("🌊", "Where Each Fixation's Copper Comes From", "Tonnes flowing from each source into each fixation (% of total)")
+                src_names = ["Stock", "Purchases", "Reallocation"]
+                src_cols  = [NAVY_LT, TEAL, GOLD]
+                src_vals  = [T_stock, T_purch, T_realloc]
+                labels = ([f"{n} · {_pc(v, T_src):.0f}%" for n, v in zip(src_names, src_vals)] +
+                          [f"{f} · {_pc(s, T_sold):.0f}%" for f, s in zip(fix_names, ins["Sold"])])
+                S, Tg, V, C = [], [], [], []
+                for j, (_, r) in enumerate(ins.iterrows()):
+                    for i, key in enumerate(["Stock", "Purch", "Realloc"]):
+                        if r[key] > 0:
+                            S.append(i); Tg.append(3 + j); V.append(r[key]); C.append(_rgba(src_cols[i], 0.38))
+                figS = go.Figure(go.Sankey(
+                    node=dict(label=labels, color=src_cols + [NAVY_MD] * len(fix_names),
+                              pad=24, thickness=22, line=dict(width=0)),
+                    link=dict(source=S, target=Tg, value=V, color=C,
+                              hovertemplate="%{source.label} → %{target.label}<br>%{value:,.1f} T<extra></extra>")))
+                alay(figS, height=420)
+                figS.update_layout(font=dict(size=13, color=INK))
+                st.plotly_chart(figS, use_container_width=True, theme=None)
+
+        with wcol:
+            with st.container(border=True):
+                sec("🧗", "Who Made — or Lost — the Money", "Contribution of each fixation to the net LME balance")
+                vals = list(ins["Bal"]) + [T_bal]
+                figW = go.Figure(go.Waterfall(
+                    x=fix_names + ["Net result"], measure=["relative"] * len(fix_names) + ["total"], y=vals,
+                    text=[f"€{fmt_compact(v)}" for v in vals], textposition="outside",
+                    increasing=dict(marker=dict(color=TEAL)), decreasing=dict(marker=dict(color=ROSE)),
+                    totals=dict(marker=dict(color=NAVY_MD)),
+                    connector=dict(line=dict(color="#c9d4ea", width=1.5)),
+                    hovertemplate="€%{y:,.0f}<extra></extra>"))
+                alay(figW, height=420, showlegend=False, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
+                st.plotly_chart(figW, use_container_width=True, theme=None)
+
+        # ── Fixation identity cards ──
+        with st.container(border=True):
+            sec("🪪", "Fixation Identity Cards", "What each fixation represents — its weight, its result and where its copper came from")
+            best_name  = pos.loc[pos["Bal"].idxmax(), "Fixation"] if not pos.empty else None
+            worst_name = neg.loc[neg["Bal"].idxmin(), "Fixation"] if not neg.empty else None
+            rows = list(ins.iterrows())
+            for i in range(0, len(rows), 3):
+                cols = st.columns(3)
+                for j, (_, r) in enumerate(rows[i:i + 3]):
+                    sold = r["Sold"]
+                    bal  = r["Bal"]
+                    col  = TEAL if bal >= 0 else ROSE
+                    sale_p = r["Sales"] / (sold * 1000) if sold else 0
+                    cost_p = r["Cost"] / (sold * 1000) if sold else 0
+                    sp     = bal / (sold * 1000) if sold else 0
+                    vshare = _pc(sold, T_sold)
+                    if r["Fixation"] == best_name:
+                        tag = "🏆 Top contributor"
+                    elif r["Fixation"] == worst_name:
+                        tag = "📉 Main drag"
+                    else:
+                        tag = "▲ Gain" if bal >= 0 else "▼ Loss"
+                    src_bar = _stack_bar([("Stock", r["Stock"], NAVY_LT), ("Purchases", r["Purch"], TEAL),
+                                          ("Realloc.", r["Realloc"], GOLD)], 10, False)
+                    src_leg = (f'Stock {_pc(r["Stock"], r["Src"]):.0f}% · Purchases {_pc(r["Purch"], r["Src"]):.0f}% · '
+                               f'Realloc. {_pc(r["Realloc"], r["Src"]):.0f}%')
+                    cols[j].markdown(
+                        f'<div style="background:#ffffff;border:1px solid #e9edf5;border-top:4px solid {col};'
+                        f'border-radius:14px;padding:16px 18px;box-shadow:0 2px 8px rgba(22,38,74,0.05);">'
+                        f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                        f'<div style="font-size:1.15rem;font-weight:800;color:{NAVY};">{r["Fixation"]}</div>'
+                        f'<div style="font-size:0.72rem;font-weight:700;color:{col};background:{col}1a;'
+                        f'padding:3px 10px;border-radius:999px;">{tag}</div></div>'
+                        f'<div style="font-size:1.7rem;font-weight:800;color:{col};margin-top:8px;">€{bal:,.0f}</div>'
+                        f'<div style="font-size:0.78rem;color:#6b7896;margin-bottom:12px;">'
+                        f'{_pc(bal, r["Sales"]):+.2f}% of its sales · {sp:+.4f} €/kg</div>'
+                        f'<div style="font-size:0.75rem;color:#6b7896;display:flex;justify-content:space-between;">'
+                        f'<span>Weight in volume sold</span><b style="color:{NAVY};">{vshare:.0f}% · {sold:,.0f} T</b></div>'
+                        f'<div style="height:8px;border-radius:4px;background:#e9edf5;margin:4px 0 12px 0;">'
+                        f'<div style="width:{vshare:.1f}%;height:8px;border-radius:4px;background:{NAVY_MD};"></div></div>'
+                        f'<div style="font-size:0.75rem;color:#6b7896;display:flex;justify-content:space-between;margin-bottom:12px;">'
+                        f'<span>Sold at → FIFO cost</span><b style="color:{NAVY};">{sale_p:.3f} → {cost_p:.3f} €/kg</b></div>'
+                        f'<div style="font-size:0.75rem;color:#6b7896;margin-bottom:4px;">Where the copper came from</div>'
+                        f'{src_bar}'
+                        f'<div style="font-size:0.7rem;color:#6b7896;margin-top:4px;">{src_leg}</div>'
+                        f'</div>', unsafe_allow_html=True)
+                st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
 # ─────────────────────────── TAB: DATA ───────────────────────────
 with tab_data:
