@@ -796,28 +796,26 @@ if len(monthly) > 1:
     sub_balance = f"{'▲' if d_bal>=0 else '▼'} €{fmt_compact(abs(d_bal))} vs last month"
     sub_qty     = f"{'▲' if d_qty>=0 else '▼'} {abs(d_qty):,.0f} T vs last month"
 
-# ── Copper impact headline (€ amount, not %) ──
-is_pos = tot_balance >= 0
-impact_bg   = "linear-gradient(120deg,#e6f7f4 0%,#d7f2ec 100%)" if is_pos else "linear-gradient(120deg,#fdecee 0%,#fbdfe3 100%)"
-impact_txt  = "#0d9488" if is_pos else "#e11d48"
-impact_icon = "📈" if is_pos else "📉"
-verb        = "added" if is_pos else "cost"
+# ── Sales headline (total sales amount — the balance itself is shown in the KPI cards) ──
+impact_bg   = "linear-gradient(120deg,#eaf0fb 0%,#dbe6f8 100%)"
+impact_txt  = NAVY_MD
+impact_icon = "💶"
 period_lbl  = ", ".join(sel_m) if len(sel_m) <= 3 else f"the {len(sel_m)} selected months"
-top_fix_row = view_fix.groupby("Fixation")["LME_Balance_Eur"].sum().reset_index()
-top_fix_row = top_fix_row.reindex(top_fix_row["LME_Balance_Eur"].abs().sort_values(ascending=False).index)
+top_fix_row = view_fix.groupby("Fixation")["Sales_Value"].sum().reset_index()
+top_fix_row = top_fix_row.sort_values("Sales_Value", ascending=False)
 top_fix = top_fix_row.iloc[0]["Fixation"] if not top_fix_row.empty else "—"
-top_ent_row = view_fix.groupby("Entity")["LME_Balance_Eur"].sum().reset_index()
-top_ent_row = top_ent_row.reindex(top_ent_row["LME_Balance_Eur"].abs().sort_values(ascending=False).index)
+top_ent_row = view_fix.groupby("Entity")["Sales_Value"].sum().reset_index()
+top_ent_row = top_ent_row.sort_values("Sales_Value", ascending=False)
 top_ent = top_ent_row.iloc[0]["Entity"] if not top_ent_row.empty else "—"
 
 st.markdown(f"""<div class="impact-banner" style="background:{impact_bg};">
   <div class="impact-icon">{impact_icon}</div>
   <div class="impact-text">
     <div class="impact-headline" style="color:{impact_txt};">
-      Copper price movements {verb} <span class="impact-amount">€{abs(tot_balance):,.0f}</span> to revenue over {period_lbl}
+      Total sales of <span class="impact-amount">€{tot_sales:,.0f}</span> over {period_lbl}
     </div>
     <div class="impact-sub" style="color:{impact_txt};">
-      Mainly driven by <strong>{top_fix}</strong> at <strong>{top_ent}</strong> · {tot_qty:,.0f} T sold in total
+      Largest share from <strong>{top_fix}</strong> at <strong>{top_ent}</strong>
     </div>
   </div>
 </div>""", unsafe_allow_html=True)
