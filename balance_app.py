@@ -194,6 +194,16 @@ span[data-baseweb="tag"], div[data-baseweb="tag"],
 .filter-label{color:#5b6478;font-size:0.68rem;font-weight:700;text-transform:uppercase;
   letter-spacing:1.5px;margin:14px 0 4px 0;}
 
+/* Month dropdown (popover) — light styling for the trigger and its floating panel */
+[data-testid="stPopover"] > button, [data-testid="stPopover"] > div > button{
+  background:#ffffff !important;border:1px solid #c7d7f2 !important;border-radius:9px !important;
+}
+[data-testid="stPopover"] button, [data-testid="stPopover"] button *{color:#16264a !important;font-weight:600;}
+[data-testid="stPopoverBody"]{background:#ffffff !important;border:1px solid #e9edf5 !important;}
+[data-testid="stPopoverBody"] label, [data-testid="stPopoverBody"] p,
+[data-testid="stPopoverBody"] span{color:#16264a !important;}
+[data-testid="stPopoverBody"] .stButton>button, [data-testid="stPopoverBody"] .stButton>button *{color:#ffffff !important;}
+
 /* Sidebar logo header */
 .sidebar-header{padding:4px 0 16px 0;}
 .sidebar-header-sub{color:#5b6478 !important;font-size:0.76rem;margin-top:8px;}
@@ -562,8 +572,32 @@ with st.sidebar:
     st.markdown('<p class="filter-label">📅 Month</p>', unsafe_allow_html=True)
     month_map = bal_all[["MonthKey","Month"]].drop_duplicates().sort_values("MonthKey")
     month_opts = month_map["Month"].tolist()
-    sel_m = st.pills("", month_opts, selection_mode="multi", default=month_opts,
-                      key="bal_month", label_visibility="collapsed")
+    # Compact dropdown (popover with checkboxes) instead of always-visible pills
+    for m in month_opts:
+        st.session_state.setdefault(f"mchk_{m}", True)
+
+    def _set_all_months(value):
+        for m in month_opts:
+            st.session_state[f"mchk_{m}"] = value
+
+    sel_m = [m for m in month_opts if st.session_state.get(f"mchk_{m}", True)]
+    if len(sel_m) == len(month_opts):
+        month_label_btn = f"All months ({len(month_opts)})"
+    elif len(sel_m) == 0:
+        month_label_btn = "No month selected"
+    elif len(sel_m) <= 2:
+        month_label_btn = ", ".join(sel_m)
+    else:
+        month_label_btn = f"{len(sel_m)} of {len(month_opts)} months"
+
+    with st.popover(month_label_btn, use_container_width=True):
+        b1, b2 = st.columns(2)
+        b1.button("All", key="mon_all", use_container_width=True,
+                  on_click=_set_all_months, args=(True,))
+        b2.button("None", key="mon_none", use_container_width=True,
+                  on_click=_set_all_months, args=(False,))
+        for m in month_opts:
+            st.checkbox(m, key=f"mchk_{m}")
 
     st.markdown("---")
     n_files = bal_all['SourceFile'].nunique()
