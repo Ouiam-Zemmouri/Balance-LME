@@ -947,7 +947,7 @@ with tab_overview:
         best_fix = rank_df.iloc[-1]
         worst_fix = rank_df.iloc[0]
         st.caption(f"🥇 **{best_fix['Fixation']}** contributes the most (€{best_fix['LME_Balance_Eur']:,.0f}) · "
-                   f"🥴 **{worst_fix['Fixation']}** drags the result down the most (€{worst_fix['LME_Balance_Eur']:,.0f})")
+                   f"📉 **{worst_fix['Fixation']}** drags the result down the most (€{worst_fix['LME_Balance_Eur']:,.0f})")
 
     if len(sel_e) > 1:
         with st.container(border=True):
