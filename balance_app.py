@@ -831,8 +831,8 @@ kpi(k3,"％","Balance % of Sales", f"{bal_pct:+.2f}%",     bal_color,
 st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
 # ══════════════════════ MAIN TABS ══════════════════════
-tab_overview, tab_analysis, tab_insights, tab_data = st.tabs(
-    ["📊 Overview", "📦 Stock & Sales Analysis", "🧠 Insights", "📋 Data"]
+tab_overview, tab_stock, tab_sales, tab_insights, tab_data = st.tabs(
+    ["📊 Overview", "📦 Stock Analysis", "💰 Sales Analysis", "🧠 Insights", "📋 Data"]
 )
 
 # ─────────────────────────── TAB: OVERVIEW ───────────────────────────
@@ -973,7 +973,7 @@ with tab_overview:
                  legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(figC, use_container_width=True, theme=None)
 
-# ─────────────────────────── TAB: STOCK & SALES ANALYSIS ───────────────────────────
+# ─────────────────────────── TABS: STOCK ANALYSIS & SALES ANALYSIS ───────────────────────────
 def flow_agg(df, qty_col, val_col):
     """Aggregate a flow (stock / purchase / sales) by fixation: total qty (T), total value (€)
     and quantity-weighted average LME price (€/kg = value / (qty in T × 1000))."""
@@ -1024,75 +1024,61 @@ def analysis_section(icon, title, sub, df, qty_col, val_col, qty_name, color, em
                      f"highest LME: **{hi['Fixation']}** ({hi['LME']:.4f} €/kg).")
         st.caption(note)
 
-with tab_analysis:
-    analysis_section("📦", "Stock Analysis", "Opening stock carried over from the previous month, by fixation",
-                     view_fix, "Qty_Stock_T", "Stock_Value", "Qty Stock", NAVY_LT,
-                     "No stock recorded for the current selection.")
-    analysis_section("🛒", "Purchase Analysis", "Purchases consumed during the month, by fixation",
-                     view_fix, "Qty_Purchase_T", "Purchase_Value", "Qty Purchased", TEAL,
-                     "No purchases consumed in the current selection.")
-    analysis_section("💰", "Sales Analysis", "Quantities sold and LME sales price, by fixation",
-                     view_fix, "Qty_Sold_T", "Sales_Value", "Qty Sold", COPPER,
-                     "No sales recorded for the current selection.")
+def flow_evolution_chart(df, qty_col, val_col, qty_name, color):
+    rows = []
+    for mk, g in df.groupby("MonthKey"):
+        q, v, p = wavg(g, qty_col, val_col)
+        rows.append({"MonthKey": mk, "Month": g["Month"].iloc[0], "Qty": q, "LME": p})
+    ev = pd.DataFrame(rows).sort_values("MonthKey")
+    ev = ev[ev["Qty"] > 0]
+    if ev.empty:
+        return None
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    fig.add_trace(go.Bar(
+        x=ev["Month"], y=ev["Qty"], name=qty_name, marker_color=color, opacity=0.85,
+        text=[f"{v:,.0f}" for v in ev["Qty"]], textposition="outside"), secondary_y=False)
+    fig.add_trace(go.Scatter(
+        x=ev["Month"], y=ev["LME"], name="Avg LME (€/kg)", mode="lines+markers",
+        line=dict(color=COPPER, width=3), marker=dict(size=10)), secondary_y=True)
+    alay(fig, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+    fig.update_yaxes(title_text="Quantity (T)", secondary_y=False, gridcolor="#f0f2f8")
+    fig.update_yaxes(title_text="LME (€/kg)", secondary_y=True, showgrid=False)
+    return fig
 
-    s_agg  = flow_agg(view_fix, "Qty_Sold_T", "Sales_Value")
-    st_agg = flow_agg(view_fix, "Qty_Stock_T", "Stock_Value")
-    p_agg  = flow_agg(view_fix, "Qty_Purchase_T", "Purchase_Value")
-
-    with st.container(border=True):
-        sec("⚖️", "LME Price Comparison — Sales vs Stock vs Purchase",
-            "Average LME fixing (€/kg) per fixation — the gap between them drives the LME Balance")
-        figPC = go.Figure()
-        for name, a, col, sym, pos in [("Sales", s_agg, COPPER, "circle", "top center"),
-                                       ("Stock", st_agg, NAVY_LT, "diamond", "bottom center"),
-                                       ("Purchase", p_agg, TEAL, "square", "middle right")]:
-            a = a[a["Qty"] > 0]
-            if a.empty:
-                continue
-            figPC.add_trace(go.Scatter(
-                x=a["Fixation"], y=a["LME"], mode="markers+text", name=name,
-                marker=dict(size=15, color=col, symbol=sym),
-                text=[f"{v:.3f}" for v in a["LME"]], textposition=pos,
-                textfont=dict(size=10, color=INK)))
-        alay(figPC, yaxis=dict(title="LME (€/kg)"), xaxis=dict(title=""),
-             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(figPC, use_container_width=True, theme=None)
+def render_flow_tab(icon, title, sub, qty_col, val_col, qty_name, color, empty_msg, key):
+    analysis_section(icon, title, sub, view_fix, qty_col, val_col, qty_name, color, empty_msg)
+    if view_fix[qty_col].sum() <= 0:
+        return
 
     if view_fix["MonthKey"].nunique() > 1:
         with st.container(border=True):
-            sec("📈", "LME Price Evolution by Month", "Weighted average LME (€/kg) for sales, stock and purchases")
-            ev_rows = []
-            for mk, g in view_fix.groupby("MonthKey"):
-                for name, qc, vc in [("Sales", "Qty_Sold_T", "Sales_Value"),
-                                     ("Stock", "Qty_Stock_T", "Stock_Value"),
-                                     ("Purchase", "Qty_Purchase_T", "Purchase_Value")]:
-                    q, v, p = wavg(g, qc, vc)
-                    if q > 0:
-                        ev_rows.append({"MonthKey": mk, "Month": g["Month"].iloc[0], "Flow": name, "LME": p})
-            if ev_rows:
-                ev = pd.DataFrame(ev_rows).sort_values("MonthKey")
-                figEV = px.line(ev, x="Month", y="LME", color="Flow", markers=True,
-                                category_orders={"Month": month_order},
-                                color_discrete_map={"Sales": COPPER, "Stock": NAVY_LT, "Purchase": TEAL})
-                figEV.update_traces(line=dict(width=3), marker=dict(size=9))
-                alay(figEV, yaxis=dict(title="LME (€/kg)"), xaxis=dict(title=""),
-                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            sec("📈", f"{qty_name} & LME Price by Month", "Monthly quantity (bars) and weighted average LME (line)")
+            figEV = flow_evolution_chart(view_fix, qty_col, val_col, qty_name, color)
+            if figEV is not None:
                 st.plotly_chart(figEV, use_container_width=True, theme=None)
 
     with st.container(border=True):
-        sec("📋", "Detail by Fixation", "Quantity and LME price for sales, stock and purchases — aggregated across the selection")
-        det = (s_agg[["Fixation", "Qty", "LME"]].rename(columns={"Qty": "Qty Sold (T)", "LME": "LME Sales (€/kg)"})
-               .merge(st_agg[["Fixation", "Qty", "LME"]].rename(columns={"Qty": "Qty Stock (T)", "LME": "LME Stock (€/kg)"}), on="Fixation", how="outer")
-               .merge(p_agg[["Fixation", "Qty", "LME"]].rename(columns={"Qty": "Qty Purchase (T)", "LME": "LME Purchase (€/kg)"}), on="Fixation", how="outer")
-               .sort_values("Fixation"))
-        det = det[["Fixation", "Qty Sold (T)", "LME Sales (€/kg)", "Qty Stock (T)", "LME Stock (€/kg)",
-                   "Qty Purchase (T)", "LME Purchase (€/kg)"]]
-        det_fmt = {c: "{:,.1f}" for c in det.columns if c.startswith("Qty")}
-        det_fmt.update({c: "{:.4f}" for c in det.columns if c.startswith("LME")})
+        sec("📋", "Detail by Fixation", "Aggregated across the current selection")
+        d = flow_agg(view_fix, qty_col, val_col)
+        d["Share"] = d["Qty"] / d["Qty"].sum() * 100
+        d = d.sort_values("Fixation")[["Fixation", "Qty", "LME", "Value", "Share"]]
+        d.columns = ["Fixation", f"{qty_name} (T)", "LME (€/kg)", "Value (€)", "Share of Qty (%)"]
+        d_fmt = {f"{qty_name} (T)": "{:,.1f}", "LME (€/kg)": "{:.4f}",
+                 "Value (€)": "€{:,.0f}", "Share of Qty (%)": "{:.1f}%"}
         st.dataframe(
-            det.style.format(det_fmt, na_rep="—")
+            d.style.format(d_fmt, na_rep="—")
                .set_properties(**{"background-color": "#ffffff", "color": INK}),
-            use_container_width=True, hide_index=True, height=38 * len(det) + 40)
+            use_container_width=True, hide_index=True, height=38 * len(d) + 40)
+
+with tab_stock:
+    render_flow_tab("📦", "Stock Analysis", "Opening stock carried over from the previous month, by fixation",
+                    "Qty_Stock_T", "Stock_Value", "Qty Stock", NAVY_LT,
+                    "No stock recorded for the current selection.", "stock")
+
+with tab_sales:
+    render_flow_tab("💰", "Sales Analysis", "Quantities sold and LME sales price, by fixation",
+                    "Qty_Sold_T", "Sales_Value", "Qty Sold", COPPER,
+                    "No sales recorded for the current selection.", "sales")
 
 # ─────────────────────────── TAB: INSIGHTS ───────────────────────────
 with tab_insights:
