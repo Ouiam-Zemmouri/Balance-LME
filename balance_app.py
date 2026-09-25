@@ -1096,32 +1096,7 @@ with tab_supply:
     if T_sold2 <= 0 and T_supply <= 0:
         st.info("Not enough data to compare supply and sales for the current selection.")
     else:
-        # ── Headline banner (isolated iframe, same technique as the Insights hero) ──
-        cover_word = "fully covered" if coverage >= 100 else "short"
         cover_color = TEAL if coverage >= 100 else ROSE
-        headline = (f'Stock &amp; purchases supplied <b>{T_supply:,.0f} T</b> against '
-                    f'<b>{T_sold2:,.0f} T</b> sold — a coverage of <b>{coverage:.0f}%</b>, '
-                    f'{cover_word} by {abs(gap):,.0f} T {"of surplus" if gap >= 0 else "made up through reallocation"}.')
-        sub = (f'Own supply was valued at <b>{(T_supply_val/(T_supply*1000)) if T_supply else 0:.4f} €/kg</b> on average, '
-               f'sold at <b>{(T_sales_val/(T_sold2*1000)) if T_sold2 else 0:.4f} €/kg</b> — '
-               f'a spread of <b>{((T_sales_val/(T_sold2*1000)) - (T_supply_val/(T_supply*1000))) if T_supply and T_sold2 else 0:+.4f} €/kg</b>.')
-        supply_hero = f'''<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-  html,body{{margin:0;padding:0;background:transparent;font-family:'Inter','Segoe UI',Arial,sans-serif;}}
-  .card{{background:linear-gradient(120deg,{NAVY} 0%,{NAVY_MD} 100%);border-radius:18px;
-    padding:26px 30px;box-shadow:0 8px 24px rgba(22,38,74,0.18);box-sizing:border-box;}}
-  .line{{font-size:1.12rem;line-height:1.6;color:#ffffff;margin:0 0 8px 0;}}
-  .soft{{font-size:1.0rem;line-height:1.6;color:#dbe6f8;}}
-  b{{color:inherit;font-weight:800;}}
-  .badge{{display:inline-block;margin-top:14px;padding:5px 14px;border-radius:999px;
-    font-size:0.78rem;font-weight:700;background:{cover_color}33;color:{cover_color if cover_color!=TEAL else '#9ff0d6'};}}
-</style></head>
-<body><div class="card">
-  <div class="line">{headline}</div>
-  <div class="soft">{sub}</div>
-  <div class="badge">{"✅ Self-sufficient" if coverage >= 100 else "🔁 Needs reallocation"}</div>
-</div></body></html>'''
-        components.html(supply_hero, height=190, scrolling=False)
 
         c1, c2, c3, c4 = st.columns(4)
         kpi(c1, "📥", "Total Supply", f"{T_supply:,.0f} T", NAVY_LT, f"Stock + purchases · €{fmt_compact(T_supply_val)}")
