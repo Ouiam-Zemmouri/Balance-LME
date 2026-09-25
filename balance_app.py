@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -1096,17 +1097,33 @@ with tab_insights:
         l3 = " &nbsp;·&nbsp; ".join(bits)
         mix_bar = _stack_bar([("Stock", T_stock, NAVY_LT), ("Purchases", T_purch, TEAL),
                               ("Reallocation", T_realloc, GOLD)], 40)
-        st.markdown(
-            f'<div style="background:linear-gradient(120deg,{NAVY} 0%,{NAVY_MD} 100%);border-radius:18px;'
-            f'padding:26px 30px;box-shadow:0 8px 24px rgba(22,38,74,0.18);margin-bottom:14px;">'
-            f'<div style="font-size:0.72rem;letter-spacing:0.14em;font-weight:700;color:#9fb4dc !important;">THE OPERATION IN 30 SECONDS</div>'
-            f'<div style="font-size:1.12rem;line-height:1.6;margin:10px 0 4px 0;color:#ffffff !important;">{l1}</div>'
-            f'<div style="font-size:1.12rem;line-height:1.6;margin-bottom:4px;color:#ffffff !important;">{l2}</div>'
-            f'<div style="font-size:1.0rem;line-height:1.6;margin-bottom:16px;color:#dbe6f8 !important;">{l3}</div>'
-            f'{mix_bar}'
-            f'<div style="font-size:0.75rem;margin-top:8px;color:#9fb4dc !important;">Origin of the copper valued against the tonnage sold '
-            f'(FIFO order: own stock → own purchases → reallocation from another fixation)</div>'
-            f'</div>', unsafe_allow_html=True)
+        # Rendered in a fully isolated iframe (components.html) so no CSS rule from the
+        # rest of the app can ever override the white text here.
+        hero_html = f'''<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  html,body{{margin:0;padding:0;background:transparent;
+    font-family:'Inter','Segoe UI',Arial,sans-serif;}}
+  .card{{background:linear-gradient(120deg,{NAVY} 0%,{NAVY_MD} 100%);border-radius:18px;
+    padding:26px 30px;box-shadow:0 8px 24px rgba(22,38,74,0.18);box-sizing:border-box;}}
+  .label{{font-size:0.72rem;letter-spacing:0.14em;font-weight:700;color:#9fb4dc;}}
+  .line{{font-size:1.12rem;line-height:1.6;color:#ffffff;margin:10px 0 4px 0;}}
+  .soft{{font-size:1.0rem;line-height:1.6;color:#dbe6f8;margin-bottom:16px;}}
+  .note{{font-size:0.75rem;color:#9fb4dc;margin-top:8px;}}
+  b, strong, span{{color:inherit;}}
+  .line b, .soft b{{color:#ffffff;font-weight:800;}}
+</style></head>
+<body>
+  <div class="card">
+    <div class="label">THE OPERATION IN 30 SECONDS</div>
+    <div class="line">{l1}</div>
+    <div class="line" style="margin-bottom:4px;">{l2}</div>
+    <div class="soft">{l3}</div>
+    {mix_bar}
+    <div class="note">Origin of the copper valued against the tonnage sold
+      (FIFO order: own stock &rarr; own purchases &rarr; reallocation from another fixation)</div>
+  </div>
+</body></html>'''
+        components.html(hero_html, height=330, scrolling=False)
 
 
         # ── 4 headline tiles ──
