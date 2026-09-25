@@ -789,8 +789,8 @@ kpi(k3,"％","Balance % of Sales", f"{bal_pct:+.2f}%",     bal_color,
 st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
 # ══════════════════════ MAIN TABS ══════════════════════
-tab_overview, tab_stock, tab_sales, tab_supply, tab_insights, tab_data = st.tabs(
-    ["📊 Overview", "📦 Stock Analysis", "💰 Sales Analysis", "⚖️ Supply vs Sales", "🧠 Insights", "📋 Data"]
+tab_overview, tab_stock, tab_purchase, tab_supply, tab_insights, tab_data = st.tabs(
+    ["📊 Overview", "📦 Stock Analysis", "🛒 Purchase Analysis", "⚖️ Supply vs Sales", "🧠 Insights", "📋 Data"]
 )
 
 # ─────────────────────────── TAB: OVERVIEW ───────────────────────────
@@ -1045,10 +1045,10 @@ with tab_stock:
                     "Qty_Stock_T", "Stock_Value", "Qty Stock", NAVY_LT,
                     "No stock recorded for the current selection.", "stock")
 
-with tab_sales:
-    render_flow_tab("💰", "Sales Analysis", "Quantities sold and LME sales price, by fixation",
-                    "Qty_Sold_T", "Sales_Value", "Qty Sold", COPPER,
-                    "No sales recorded for the current selection.", "sales")
+with tab_purchase:
+    render_flow_tab("🛒", "Purchase Analysis", "Purchases consumed during the month and their LME price, by fixation",
+                    "Qty_Purchase_T", "Purchase_Value", "Qty Purchased", TEAL,
+                    "No purchases consumed for the current selection.", "purchase")
 
 def _pc(a, b):
     return (a / b * 100) if b else 0.0
