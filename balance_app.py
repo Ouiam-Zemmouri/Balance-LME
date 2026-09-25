@@ -904,7 +904,7 @@ with tab_overview:
 
     if len(sel_e) > 1:
         with st.container(border=True):
-            sec("🌍","Kenitra vs Maroc — Fixation by Fixation", "Who performs better on which fixation?")
+            sec("🌍","Kenitra vs Maroc — Fixation by Fixation", "Global view (YTD) — who performs better on which fixation?")
             figEF = px.bar(view_fix.groupby(["Entity","Fixation"])["LME_Balance_Eur"].sum().reset_index(),
                            x="Fixation", y="LME_Balance_Eur", color="Entity",
                            barmode="group", text_auto=",.0f", color_discrete_map=ENT_COLOR)
@@ -916,7 +916,7 @@ with tab_overview:
 
     if len(sel_e) > 1 or len(sel_m) > 1:
         with st.container(border=True):
-            sec("🌍","Balance by Entity & Month", "Side-by-side comparison")
+            sec("🌍","Balance by Entity & Month", "Monthly view — side-by-side comparison")
             figC = px.bar(view_tot, x="Month", y="LME_Balance_Eur", color="Entity",
                           barmode="group", text_auto=",.0f",
                           category_orders={"Month": month_order}, color_discrete_map=ENT_COLOR)
@@ -1063,7 +1063,10 @@ with tab_insights:
                 "Sales_Value", "Final_Value", "LME_Balance_Eur"]
     for c in num_cols:
         fx[c] = pd.to_numeric(fx[c], errors="coerce").fillna(0)
-    ins = fx.groupby("Fixation")[num_cols].sum().reset_index().sort_values("Fixation")
+    FIX_ORDER = {"M-1": 0, "3M-1": 1, "3M-2": 2}
+    ins = fx.groupby("Fixation")[num_cols].sum().reset_index()
+    ins["_ord"] = ins["Fixation"].map(FIX_ORDER).fillna(99)
+    ins = ins.sort_values("_ord").drop(columns="_ord").reset_index(drop=True)
     ins.columns = ["Fixation", "Sold", "Stock", "Purch", "Realloc", "Sales", "Cost", "Bal"]
     ins["Src"] = ins["Stock"] + ins["Purch"] + ins["Realloc"]
 
@@ -1080,7 +1083,7 @@ with tab_insights:
 
         # ── Hero: the whole operation in three sentences + source-mix bar ──
         def _b(txt, color="#ffffff"):
-            return f'<span style="color:{color} !important;font-weight:800;">{txt}</span>'
+            return f'<span style="color:{color} !important;">{txt}</span>'
 
         l1 = (f'Out of every {_b("100 T")} sold, {_b(f"{_pc(T_stock,T_src):.0f} T")} came from stock, '
               f'{_b(f"{_pc(T_purch,T_src):.0f} T")} from purchases and '
@@ -1105,16 +1108,13 @@ with tab_insights:
     font-family:'Inter','Segoe UI',Arial,sans-serif;}}
   .card{{background:linear-gradient(120deg,{NAVY} 0%,{NAVY_MD} 100%);border-radius:18px;
     padding:26px 30px;box-shadow:0 8px 24px rgba(22,38,74,0.18);box-sizing:border-box;}}
-  .label{{font-size:0.72rem;letter-spacing:0.14em;font-weight:700;color:#9fb4dc;}}
-  .line{{font-size:1.12rem;line-height:1.6;color:#ffffff;margin:10px 0 4px 0;}}
+  .line{{font-size:1.12rem;line-height:1.6;color:#ffffff;margin:0 0 4px 0;}}
   .soft{{font-size:1.0rem;line-height:1.6;color:#dbe6f8;margin-bottom:16px;}}
   .note{{font-size:0.75rem;color:#9fb4dc;margin-top:8px;}}
-  b, strong, span{{color:inherit;}}
-  .line b, .soft b{{color:#ffffff;font-weight:800;}}
+  b, strong, span{{color:inherit;font-weight:inherit;}}
 </style></head>
 <body>
   <div class="card">
-    <div class="label">THE OPERATION IN 30 SECONDS</div>
     <div class="line">{l1}</div>
     <div class="line" style="margin-bottom:4px;">{l2}</div>
     <div class="soft">{l3}</div>
@@ -1123,7 +1123,7 @@ with tab_insights:
       (FIFO order: own stock &rarr; own purchases &rarr; reallocation from another fixation)</div>
   </div>
 </body></html>'''
-        components.html(hero_html, height=330, scrolling=False)
+        components.html(hero_html, height=300, scrolling=False)
 
 
         # ── 4 headline tiles ──
@@ -1138,45 +1138,29 @@ with tab_insights:
         kpi(t4, "✅", "Favorable Periods", f"{_pc(n_fav, n_tot):.0f}%", TEAL, f"{n_fav} of {n_tot} entity × month")
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-        # ── Flow (Sankey) + contribution (Waterfall) ──
-        fcol, wcol = st.columns([3, 2])
+        # ── Flow (Sankey) ──
         fix_names = list(ins["Fixation"])
 
-        with fcol:
-            with st.container(border=True):
-                sec("🌊", "Where Each Fixation's Copper Comes From", "Tonnes flowing from each source into each fixation (% of total)")
-                src_names = ["Stock", "Purchases", "Reallocation"]
-                src_cols  = [NAVY_LT, TEAL, GOLD]
-                src_vals  = [T_stock, T_purch, T_realloc]
-                labels = ([f"{n} · {_pc(v, T_src):.0f}%" for n, v in zip(src_names, src_vals)] +
-                          [f"{f} · {_pc(s, T_sold):.0f}%" for f, s in zip(fix_names, ins["Sold"])])
-                S, Tg, V, C = [], [], [], []
-                for j, (_, r) in enumerate(ins.iterrows()):
-                    for i, key in enumerate(["Stock", "Purch", "Realloc"]):
-                        if r[key] > 0:
-                            S.append(i); Tg.append(3 + j); V.append(r[key]); C.append(_rgba(src_cols[i], 0.38))
-                figS = go.Figure(go.Sankey(
-                    node=dict(label=labels, color=src_cols + [NAVY_MD] * len(fix_names),
-                              pad=24, thickness=22, line=dict(width=0)),
-                    link=dict(source=S, target=Tg, value=V, color=C,
-                              hovertemplate="%{source.label} → %{target.label}<br>%{value:,.1f} T<extra></extra>")))
-                alay(figS, height=420)
-                figS.update_layout(font=dict(size=13, color=INK))
-                st.plotly_chart(figS, use_container_width=True, theme=None)
-
-        with wcol:
-            with st.container(border=True):
-                sec("🧗", "Who Made — or Lost — the Money", "Contribution of each fixation to the net LME balance")
-                vals = list(ins["Bal"]) + [T_bal]
-                figW = go.Figure(go.Waterfall(
-                    x=fix_names + ["Net result"], measure=["relative"] * len(fix_names) + ["total"], y=vals,
-                    text=[f"€{fmt_compact(v)}" for v in vals], textposition="outside",
-                    increasing=dict(marker=dict(color=TEAL)), decreasing=dict(marker=dict(color=ROSE)),
-                    totals=dict(marker=dict(color=NAVY_MD)),
-                    connector=dict(line=dict(color="#c9d4ea", width=1.5)),
-                    hovertemplate="€%{y:,.0f}<extra></extra>"))
-                alay(figW, height=420, showlegend=False, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
-                st.plotly_chart(figW, use_container_width=True, theme=None)
+        with st.container(border=True):
+            sec("🌊", "Where Each Fixation's Copper Comes From", "Tonnes flowing from each source into each fixation (% of total)")
+            src_names = ["Stock", "Purchases", "Reallocation"]
+            src_cols  = [NAVY_LT, TEAL, GOLD]
+            src_vals  = [T_stock, T_purch, T_realloc]
+            labels = ([f"{n} · {_pc(v, T_src):.0f}%" for n, v in zip(src_names, src_vals)] +
+                      [f"{f} · {_pc(s, T_sold):.0f}%" for f, s in zip(fix_names, ins["Sold"])])
+            S, Tg, V, C = [], [], [], []
+            for j, (_, r) in enumerate(ins.iterrows()):
+                for i, key in enumerate(["Stock", "Purch", "Realloc"]):
+                    if r[key] > 0:
+                        S.append(i); Tg.append(3 + j); V.append(r[key]); C.append(_rgba(src_cols[i], 0.38))
+            figS = go.Figure(go.Sankey(
+                node=dict(label=labels, color=src_cols + [NAVY_MD] * len(fix_names),
+                          pad=24, thickness=22, line=dict(width=0)),
+                link=dict(source=S, target=Tg, value=V, color=C,
+                          hovertemplate="%{source.label} → %{target.label}<br>%{value:,.1f} T<extra></extra>")))
+            alay(figS, height=420)
+            figS.update_layout(font=dict(size=13, color=INK))
+            st.plotly_chart(figS, use_container_width=True, theme=None)
 
         # ── Fixation identity cards ──
         with st.container(border=True):
