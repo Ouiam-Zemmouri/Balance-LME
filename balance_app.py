@@ -955,13 +955,14 @@ def wavg(df, qty_col, val_col):
     return q, v, (v / (q * 1000) if q > 0 else None)
 
 def combo_fixation_chart(agg, qty_name, bar_color):
+    line_color = NAVY_MD if bar_color == COPPER else COPPER
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     fig.add_trace(go.Bar(
         x=agg["Fixation"], y=agg["Qty"], name=qty_name, marker_color=bar_color, opacity=0.85,
         text=[f"{v:,.1f}" for v in agg["Qty"]], textposition="outside"), secondary_y=False)
     fig.add_trace(go.Scatter(
         x=agg["Fixation"], y=agg["LME"], name="Avg LME (€/kg)", mode="lines+markers",
-        line=dict(color=COPPER, width=3), marker=dict(size=10)), secondary_y=True)
+        line=dict(color=line_color, width=3), marker=dict(size=10)), secondary_y=True)
     alay(fig, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     fig.update_yaxes(title_text="Quantity (T)", secondary_y=False, gridcolor="#f0f2f8")
     fig.update_yaxes(title_text="LME (€/kg)", secondary_y=True, showgrid=False)
@@ -993,6 +994,7 @@ def analysis_section(icon, title, sub, df, qty_col, val_col, qty_name, color, em
         st.caption(note)
 
 def flow_evolution_chart(df, qty_col, val_col, qty_name, color):
+    line_color = NAVY_MD if color == COPPER else COPPER
     rows = []
     for mk, g in df.groupby("MonthKey"):
         q, v, p = wavg(g, qty_col, val_col)
@@ -1007,7 +1009,7 @@ def flow_evolution_chart(df, qty_col, val_col, qty_name, color):
         text=[f"{v:,.0f}" for v in ev["Qty"]], textposition="outside"), secondary_y=False)
     fig.add_trace(go.Scatter(
         x=ev["Month"], y=ev["LME"], name="Avg LME (€/kg)", mode="lines+markers",
-        line=dict(color=COPPER, width=3), marker=dict(size=10)), secondary_y=True)
+        line=dict(color=line_color, width=3), marker=dict(size=10)), secondary_y=True)
     alay(fig, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     fig.update_yaxes(title_text="Quantity (T)", secondary_y=False, gridcolor="#f0f2f8")
     fig.update_yaxes(title_text="LME (€/kg)", secondary_y=True, showgrid=False)
