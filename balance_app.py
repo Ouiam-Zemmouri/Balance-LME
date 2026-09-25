@@ -1232,7 +1232,7 @@ with tab_insights:
         fix_names = list(ins["Fixation"])
 
         with st.container(border=True):
-            sec("🌊", "Where Each Fixation's Copper Comes From", "Tonnes flowing from each source into each fixation (% of total)")
+            sec("🌊", "Copper Sourcing Map", "Tonnes flowing from each source into each fixation (% of total)")
             src_names = ["Stock", "Purchases", "Reallocation"]
             src_cols  = [NAVY_LT, TEAL, GOLD]
             src_vals  = [T_stock, T_purch, T_realloc]
