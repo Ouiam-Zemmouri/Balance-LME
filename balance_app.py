@@ -789,8 +789,8 @@ kpi(k3,"％","Balance % of Sales", f"{bal_pct:+.2f}%",     bal_color,
 st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
 # ══════════════════════ MAIN TABS ══════════════════════
-tab_overview, tab_stock, tab_sales, tab_insights, tab_data = st.tabs(
-    ["📊 Overview", "📦 Stock Analysis", "💰 Sales Analysis", "🧠 Insights", "📋 Data"]
+tab_overview, tab_stock, tab_sales, tab_supply, tab_insights, tab_data = st.tabs(
+    ["📊 Overview", "📦 Stock Analysis", "💰 Sales Analysis", "⚖️ Supply vs Sales", "🧠 Insights", "📋 Data"]
 )
 
 # ─────────────────────────── TAB: OVERVIEW ───────────────────────────
@@ -1047,6 +1047,117 @@ with tab_sales:
     render_flow_tab("💰", "Sales Analysis", "Quantities sold and LME sales price, by fixation",
                     "Qty_Sold_T", "Sales_Value", "Qty Sold", COPPER,
                     "No sales recorded for the current selection.", "sales")
+
+with tab_supply:
+    sup = view_fix.copy()
+    for c in ["Qty_Stock_T","Qty_Purchase_T","Qty_Sold_T","Stock_Value","Purchase_Value","Sales_Value"]:
+        sup[c] = pd.to_numeric(sup[c], errors="coerce").fillna(0)
+    sup["Supply_T"] = sup["Qty_Stock_T"] + sup["Qty_Purchase_T"]
+    sup["Supply_Value"] = sup["Stock_Value"] + sup["Purchase_Value"]
+
+    g = sup.groupby("Fixation")[["Supply_T","Supply_Value","Qty_Sold_T","Sales_Value"]].sum().reset_index()
+    g["Supply_LME"] = g["Supply_Value"] / (g["Supply_T"].where(g["Supply_T"] > 0) * 1000)
+    g["Sales_LME"]  = g["Sales_Value"]  / (g["Qty_Sold_T"].where(g["Qty_Sold_T"] > 0) * 1000)
+    g["Gap_T"] = g["Supply_T"] - g["Qty_Sold_T"]
+    FIX_ORDER2 = {"M-1": 0, "3M-1": 1, "3M-2": 2}
+    g["_ord"] = g["Fixation"].map(FIX_ORDER2).fillna(99)
+    g = g.sort_values("_ord").drop(columns="_ord").reset_index(drop=True)
+
+    T_supply, T_sold2 = g["Supply_T"].sum(), g["Qty_Sold_T"].sum()
+    T_supply_val, T_sales_val = g["Supply_Value"].sum(), g["Sales_Value"].sum()
+    coverage = _pc(T_supply, T_sold2) if T_sold2 else 0
+    gap = T_supply - T_sold2
+
+    if T_sold2 <= 0 and T_supply <= 0:
+        st.info("Not enough data to compare supply and sales for the current selection.")
+    else:
+        # ── Headline banner (isolated iframe, same technique as the Insights hero) ──
+        cover_word = "fully covered" if coverage >= 100 else "short"
+        cover_color = TEAL if coverage >= 100 else ROSE
+        headline = (f'Stock &amp; purchases supplied <b>{T_supply:,.0f} T</b> against '
+                    f'<b>{T_sold2:,.0f} T</b> sold — a coverage of <b>{coverage:.0f}%</b>, '
+                    f'{cover_word} by {abs(gap):,.0f} T {"of surplus" if gap >= 0 else "made up through reallocation"}.')
+        sub = (f'Own supply was valued at <b>{(T_supply_val/(T_supply*1000)) if T_supply else 0:.4f} €/kg</b> on average, '
+               f'sold at <b>{(T_sales_val/(T_sold2*1000)) if T_sold2 else 0:.4f} €/kg</b> — '
+               f'a spread of <b>{((T_sales_val/(T_sold2*1000)) - (T_supply_val/(T_supply*1000))) if T_supply and T_sold2 else 0:+.4f} €/kg</b>.')
+        supply_hero = f'''<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  html,body{{margin:0;padding:0;background:transparent;font-family:'Inter','Segoe UI',Arial,sans-serif;}}
+  .card{{background:linear-gradient(120deg,{NAVY} 0%,{NAVY_MD} 100%);border-radius:18px;
+    padding:26px 30px;box-shadow:0 8px 24px rgba(22,38,74,0.18);box-sizing:border-box;}}
+  .line{{font-size:1.12rem;line-height:1.6;color:#ffffff;margin:0 0 8px 0;}}
+  .soft{{font-size:1.0rem;line-height:1.6;color:#dbe6f8;}}
+  b{{color:inherit;font-weight:800;}}
+  .badge{{display:inline-block;margin-top:14px;padding:5px 14px;border-radius:999px;
+    font-size:0.78rem;font-weight:700;background:{cover_color}33;color:{cover_color if cover_color!=TEAL else '#9ff0d6'};}}
+</style></head>
+<body><div class="card">
+  <div class="line">{headline}</div>
+  <div class="soft">{sub}</div>
+  <div class="badge">{"✅ Self-sufficient" if coverage >= 100 else "🔁 Needs reallocation"}</div>
+</div></body></html>'''
+        components.html(supply_hero, height=190, scrolling=False)
+
+        c1, c2, c3, c4 = st.columns(4)
+        kpi(c1, "📥", "Total Supply", f"{T_supply:,.0f} T", NAVY_LT, f"Stock + purchases · €{fmt_compact(T_supply_val)}")
+        kpi(c2, "📤", "Total Sold", f"{T_sold2:,.0f} T", COPPER, f"€{fmt_compact(T_sales_val)}")
+        kpi(c3, "🎯", "Coverage", f"{coverage:.0f}%", cover_color, "Supply vs sales, by tonnage")
+        kpi(c4, "⚖️", "Net Gap", f"{gap:+,.0f} T", TEAL if gap >= 0 else ROSE,
+            "Surplus left unsold" if gap >= 0 else "Covered by reallocation")
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+        with st.container(border=True):
+            sec("📊", "Supply vs Sales, by Fixation", "Tonnage supplied (stock + purchases) against tonnage sold, with average LME price")
+            gv = g[(g["Supply_T"] > 0) | (g["Qty_Sold_T"] > 0)]
+            figSV = go.Figure()
+            figSV.add_trace(go.Bar(x=gv["Fixation"], y=gv["Supply_T"], name="Supply (Stock+Purchase)",
+                                    marker_color=NAVY_LT, opacity=0.85,
+                                    hovertemplate="%{y:,.1f} T<extra></extra>"))
+            figSV.add_trace(go.Bar(x=gv["Fixation"], y=gv["Qty_Sold_T"], name="Sold",
+                                    marker_color=COPPER, opacity=0.85,
+                                    hovertemplate="%{y:,.1f} T<extra></extra>"))
+            alay(figSV, barmode="group", height=420,
+                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                 yaxis=dict(title="Quantity (T)"), xaxis=dict(title=""))
+            st.plotly_chart(figSV, use_container_width=True, theme=None)
+
+        pcol, gcol = st.columns(2)
+        with pcol:
+            with st.container(border=True):
+                sec("🔶", "Price: Supply Cost vs Sales Price", "Average LME €/kg — the wider the gap, the bigger the margin")
+                figP = go.Figure()
+                figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Supply_LME"], name="Supply LME (€/kg)",
+                                       marker_color=NAVY_LT, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
+                figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Sales_LME"], name="Sales LME (€/kg)",
+                                       marker_color=COPPER, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
+                alay(figP, barmode="group", height=360,
+                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                     yaxis=dict(title="€/kg"), xaxis=dict(title=""))
+                st.plotly_chart(figP, use_container_width=True, theme=None)
+
+        with gcol:
+            with st.container(border=True):
+                sec("🔁", "Coverage Gap by Fixation", "Positive = leftover supply · Negative = topped up via reallocation")
+                figG = go.Figure(go.Bar(
+                    x=gv["Fixation"], y=gv["Gap_T"],
+                    marker_color=[TEAL if v >= 0 else GOLD for v in gv["Gap_T"]],
+                    text=[f"{v:+,.0f} T" for v in gv["Gap_T"]], textposition="outside",
+                    hovertemplate="%{y:+,.1f} T<extra></extra>"))
+                figG.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
+                alay(figG, height=360, showlegend=False, yaxis=dict(title="Gap (T)"), xaxis=dict(title=""))
+                st.plotly_chart(figG, use_container_width=True, theme=None)
+
+        with st.container(border=True):
+            sec("📋", "Detail by Fixation", "Supply, sales, prices and coverage — aggregated across the current selection")
+            det = gv[["Fixation","Supply_T","Supply_LME","Qty_Sold_T","Sales_LME","Gap_T"]].copy()
+            det["Coverage %"] = det.apply(lambda r: _pc(r["Supply_T"], r["Qty_Sold_T"]) if r["Qty_Sold_T"] else None, axis=1)
+            det.columns = ["Fixation","Supply (T)","Supply LME (€/kg)","Sold (T)","Sales LME (€/kg)","Gap (T)","Coverage %"]
+            det_fmt = {"Supply (T)":"{:,.1f}","Sold (T)":"{:,.1f}","Gap (T)":"{:+,.1f}",
+                       "Supply LME (€/kg)":"{:.4f}","Sales LME (€/kg)":"{:.4f}","Coverage %":"{:.0f}%"}
+            st.dataframe(
+                det.style.format(det_fmt, na_rep="—")
+                   .set_properties(**{"background-color": "#ffffff", "color": INK}),
+                use_container_width=True, hide_index=True, height=38*len(det)+40)
 
 # ─────────────────────────── TAB: INSIGHTS ───────────────────────────
 def _pc(a, b):
