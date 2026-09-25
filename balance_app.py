@@ -1129,31 +1129,50 @@ with tab_supply:
             "Surplus left unsold" if gap >= 0 else "Covered by reallocation")
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
+        gv = g[(g["Supply_T"] > 0) | (g["Qty_Sold_T"] > 0)].reset_index(drop=True)
+
         with st.container(border=True):
-            sec("📊", "Supply vs Sales, by Fixation", "Tonnage supplied (stock + purchases) against tonnage sold, with average LME price")
-            gv = g[(g["Supply_T"] > 0) | (g["Qty_Sold_T"] > 0)]
+            sec("🦋", "Supply vs Sales, by Fixation", "Tornado view — supply on the left, sales on the right; the wider side wins")
             figSV = go.Figure()
-            figSV.add_trace(go.Bar(x=gv["Fixation"], y=gv["Supply_T"], name="Supply (Stock+Purchase)",
-                                    marker_color=NAVY_LT, opacity=0.85,
-                                    hovertemplate="%{y:,.1f} T<extra></extra>"))
-            figSV.add_trace(go.Bar(x=gv["Fixation"], y=gv["Qty_Sold_T"], name="Sold",
-                                    marker_color=COPPER, opacity=0.85,
-                                    hovertemplate="%{y:,.1f} T<extra></extra>"))
-            alay(figSV, barmode="group", height=420,
+            figSV.add_trace(go.Bar(
+                y=gv["Fixation"], x=-gv["Supply_T"], name="Supply (Stock+Purchase)", orientation="h",
+                marker_color=NAVY_LT, text=[f"{v:,.0f} T" for v in gv["Supply_T"]], textposition="outside",
+                hovertemplate="%{customdata:,.1f} T<extra></extra>", customdata=gv["Supply_T"]))
+            figSV.add_trace(go.Bar(
+                y=gv["Fixation"], x=gv["Qty_Sold_T"], name="Sold", orientation="h",
+                marker_color=COPPER, text=[f"{v:,.0f} T" for v in gv["Qty_Sold_T"]], textposition="outside",
+                hovertemplate="%{x:,.1f} T<extra></extra>"))
+            figSV.add_vline(x=0, line_color="#c9d4ea", line_width=1.5)
+            m = max(gv["Supply_T"].max(), gv["Qty_Sold_T"].max()) * 1.35 if len(gv) else 1
+            alay(figSV, barmode="overlay", height=120 + 90 * len(gv),
                  legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                 yaxis=dict(title="Quantity (T)"), xaxis=dict(title=""))
+                 xaxis=dict(title="Quantity (T)  ←  Supply   |   Sold  →", range=[-m, m],
+                             tickvals=[-m*0.66, -m*0.33, 0, m*0.33, m*0.66],
+                             ticktext=[f"{m*0.66:,.0f}", f"{m*0.33:,.0f}", "0", f"{m*0.33:,.0f}", f"{m*0.66:,.0f}"]),
+                 yaxis=dict(title=""))
             st.plotly_chart(figSV, use_container_width=True, theme=None)
 
         with st.container(border=True):
-            sec("🔶", "Price: Supply Cost vs Sales Price", "Average LME €/kg — the wider the gap, the bigger the margin")
+            sec("🎯", "Price: Supply Cost vs Sales Price", "Dumbbell view — each line is the margin captured on that fixation (€/kg)")
             figP = go.Figure()
-            figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Supply_LME"], name="Supply LME (€/kg)",
-                                   marker_color=NAVY_LT, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
-            figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Sales_LME"], name="Sales LME (€/kg)",
-                                   marker_color=COPPER, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
-            alay(figP, barmode="group", height=380,
+            for _, r in gv.iterrows():
+                if pd.isna(r["Supply_LME"]) or pd.isna(r["Sales_LME"]):
+                    continue
+                up = r["Sales_LME"] >= r["Supply_LME"]
+                figP.add_trace(go.Scatter(
+                    x=[r["Supply_LME"], r["Sales_LME"]], y=[r["Fixation"]] * 2, mode="lines",
+                    line=dict(color=TEAL if up else ROSE, width=4), showlegend=False, hoverinfo="skip"))
+            figP.add_trace(go.Scatter(
+                x=gv["Supply_LME"], y=gv["Fixation"], mode="markers", name="Supply LME (€/kg)",
+                marker=dict(size=16, color=NAVY_LT, line=dict(color="#ffffff", width=2)),
+                hovertemplate="%{x:.4f} €/kg<extra></extra>"))
+            figP.add_trace(go.Scatter(
+                x=gv["Sales_LME"], y=gv["Fixation"], mode="markers", name="Sales LME (€/kg)",
+                marker=dict(size=16, color=COPPER, line=dict(color="#ffffff", width=2)),
+                hovertemplate="%{x:.4f} €/kg<extra></extra>"))
+            alay(figP, height=120 + 90 * len(gv),
                  legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                 yaxis=dict(title="€/kg"), xaxis=dict(title=""))
+                 xaxis=dict(title="€/kg"), yaxis=dict(title=""))
             st.plotly_chart(figP, use_container_width=True, theme=None)
 
         with st.container(border=True):
