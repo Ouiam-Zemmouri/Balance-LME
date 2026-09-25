@@ -1144,31 +1144,17 @@ with tab_supply:
                  yaxis=dict(title="Quantity (T)"), xaxis=dict(title=""))
             st.plotly_chart(figSV, use_container_width=True, theme=None)
 
-        pcol, gcol = st.columns(2)
-        with pcol:
-            with st.container(border=True):
-                sec("🔶", "Price: Supply Cost vs Sales Price", "Average LME €/kg — the wider the gap, the bigger the margin")
-                figP = go.Figure()
-                figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Supply_LME"], name="Supply LME (€/kg)",
-                                       marker_color=NAVY_LT, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
-                figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Sales_LME"], name="Sales LME (€/kg)",
-                                       marker_color=COPPER, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
-                alay(figP, barmode="group", height=360,
-                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                     yaxis=dict(title="€/kg"), xaxis=dict(title=""))
-                st.plotly_chart(figP, use_container_width=True, theme=None)
-
-        with gcol:
-            with st.container(border=True):
-                sec("🔁", "Coverage Gap by Fixation", "Positive = leftover supply · Negative = topped up via reallocation")
-                figG = go.Figure(go.Bar(
-                    x=gv["Fixation"], y=gv["Gap_T"],
-                    marker_color=[TEAL if v >= 0 else GOLD for v in gv["Gap_T"]],
-                    text=[f"{v:+,.0f} T" for v in gv["Gap_T"]], textposition="outside",
-                    hovertemplate="%{y:+,.1f} T<extra></extra>"))
-                figG.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
-                alay(figG, height=360, showlegend=False, yaxis=dict(title="Gap (T)"), xaxis=dict(title=""))
-                st.plotly_chart(figG, use_container_width=True, theme=None)
+        with st.container(border=True):
+            sec("🔶", "Price: Supply Cost vs Sales Price", "Average LME €/kg — the wider the gap, the bigger the margin")
+            figP = go.Figure()
+            figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Supply_LME"], name="Supply LME (€/kg)",
+                                   marker_color=NAVY_LT, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
+            figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Sales_LME"], name="Sales LME (€/kg)",
+                                   marker_color=COPPER, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
+            alay(figP, barmode="group", height=380,
+                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                 yaxis=dict(title="€/kg"), xaxis=dict(title=""))
+            st.plotly_chart(figP, use_container_width=True, theme=None)
 
         with st.container(border=True):
             sec("📋", "Detail by Fixation", "Supply, sales, prices and coverage — aggregated across the current selection")
