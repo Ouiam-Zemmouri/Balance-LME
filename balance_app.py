@@ -1048,6 +1048,29 @@ with tab_sales:
                     "Qty_Sold_T", "Sales_Value", "Qty Sold", COPPER,
                     "No sales recorded for the current selection.", "sales")
 
+def _pc(a, b):
+    return (a / b * 100) if b else 0.0
+
+def _rgba(hexc, alpha):
+    h = hexc.lstrip("#")
+    return f"rgba({int(h[0:2],16)},{int(h[2:4],16)},{int(h[4:6],16)},{alpha})"
+
+def _stack_bar(parts, height=34, show_text=True):
+    """100% stacked horizontal bar (pure HTML). parts = [(label, value, color), ...]"""
+    total = sum(v for _, v, _ in parts if v > 0)
+    if total <= 0:
+        return ""
+    segs = ""
+    for label, v, c in parts:
+        if v <= 0:
+            continue
+        p = v / total * 100
+        txt = f"{label} {p:.0f}%" if (show_text and p >= 9) else ""
+        segs += (f'<div style="width:{p:.2f}%;background:{c};color:#ffffff;display:flex;align-items:center;'
+                 f'justify-content:center;font-size:0.8rem;font-weight:700;white-space:nowrap;">{txt}</div>')
+    return (f'<div style="display:flex;height:{height}px;border-radius:{height//2}px;overflow:hidden;'
+            f'background:#e9edf5;">{segs}</div>')
+
 with tab_supply:
     sup = view_fix.copy()
     for c in ["Qty_Stock_T","Qty_Purchase_T","Qty_Sold_T","Stock_Value","Purchase_Value","Sales_Value"]:
@@ -1160,29 +1183,6 @@ with tab_supply:
                 use_container_width=True, hide_index=True, height=38*len(det)+40)
 
 # ─────────────────────────── TAB: INSIGHTS ───────────────────────────
-def _pc(a, b):
-    return (a / b * 100) if b else 0.0
-
-def _rgba(hexc, alpha):
-    h = hexc.lstrip("#")
-    return f"rgba({int(h[0:2],16)},{int(h[2:4],16)},{int(h[4:6],16)},{alpha})"
-
-def _stack_bar(parts, height=34, show_text=True):
-    """100% stacked horizontal bar (pure HTML). parts = [(label, value, color), ...]"""
-    total = sum(v for _, v, _ in parts if v > 0)
-    if total <= 0:
-        return ""
-    segs = ""
-    for label, v, c in parts:
-        if v <= 0:
-            continue
-        p = v / total * 100
-        txt = f"{label} {p:.0f}%" if (show_text and p >= 9) else ""
-        segs += (f'<div style="width:{p:.2f}%;background:{c};color:#ffffff;display:flex;align-items:center;'
-                 f'justify-content:center;font-size:0.8rem;font-weight:700;white-space:nowrap;">{txt}</div>')
-    return (f'<div style="display:flex;height:{height}px;border-radius:{height//2}px;overflow:hidden;'
-            f'background:#e9edf5;">{segs}</div>')
-
 with tab_insights:
     fx = view_fix.copy()
     num_cols = ["Qty_Sold_T", "Qty_Stock_T", "Qty_Purchase_T", "Allocated_QTE",
