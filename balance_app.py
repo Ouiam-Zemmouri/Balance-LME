@@ -183,6 +183,21 @@ div[data-testid="stVerticalBlockBorderWrapper"]{
   box-shadow:0 2px 10px rgba(20,35,70,0.04);
 }
 
+/* Equal-height cards: when two bordered cards sit side by side in a row of
+   columns, stretch both to the height of the tallest one so their bottom
+   edges line up instead of one card trailing off shorter than the other. */
+div[data-testid="stHorizontalBlock"]{align-items:stretch;}
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]{display:flex;}
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] > div{
+  display:flex;flex-direction:column;width:100%;
+}
+div[data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlockBorderWrapper"]{
+  flex:1;display:flex;flex-direction:column;
+}
+div[data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] > div{
+  flex:1;display:flex;flex-direction:column;
+}
+
 /* Filter pills (multiselect tags) — force brand colors regardless of Streamlit's internal DOM */
 span[data-baseweb="tag"], div[data-baseweb="tag"],
 [data-baseweb="tag"], [data-baseweb="tag"] *,
