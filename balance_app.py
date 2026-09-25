@@ -904,7 +904,7 @@ with tab_overview:
 
     if len(sel_e) > 1:
         with st.container(border=True):
-            sec("🌍","Kenitra vs Maroc — Fixation by Fixation", "Global view (YTD) — who performs better on which fixation?")
+            sec("🌍","Global View (YTD)", "Kenitra vs Maroc, fixation by fixation — who performs better on which fixation?")
             figEF = px.bar(view_fix.groupby(["Entity","Fixation"])["LME_Balance_Eur"].sum().reset_index(),
                            x="Fixation", y="LME_Balance_Eur", color="Entity",
                            barmode="group", text_auto=",.0f", color_discrete_map=ENT_COLOR)
@@ -916,7 +916,7 @@ with tab_overview:
 
     if len(sel_e) > 1 or len(sel_m) > 1:
         with st.container(border=True):
-            sec("🌍","Balance by Entity & Month", "Monthly view — side-by-side comparison")
+            sec("🌍","Monthly View", "Balance by entity & month — side-by-side comparison")
             figC = px.bar(view_tot, x="Month", y="LME_Balance_Eur", color="Entity",
                           barmode="group", text_auto=",.0f",
                           category_orders={"Month": month_order}, color_discrete_map=ENT_COLOR)
