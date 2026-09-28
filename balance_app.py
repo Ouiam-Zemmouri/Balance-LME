@@ -805,6 +805,14 @@ with tab_overview:
             })
         ).reset_index().sort_values("MonthKey")
 
+        # Cumulative weighted purchase price: ALL consumed purchases from the first selected
+        # month up to each month (value / (tonnes x 1000)), not only that month's purchases.
+        _pm = (view_fix.assign(_q=pd.to_numeric(view_fix["Qty_Purchase_T"], errors="coerce").fillna(0),
+                               _v=pd.to_numeric(view_fix["Purchase_Value"], errors="coerce").fillna(0))
+               .groupby("MonthKey")[["_q", "_v"]].sum().sort_index().cumsum())
+        _pm["Cum_Purchase_Price"] = _pm["_v"] / (_pm["_q"].where(_pm["_q"] > 0) * 1000)
+        cp_monthly["Avg_Purchase_Price"] = cp_monthly["MonthKey"].map(_pm["Cum_Purchase_Price"])
+
         if len(cp_monthly) > 1:
             figCP = make_subplots(specs=[[{"secondary_y": True}]])
             figCP.add_trace(go.Bar(
@@ -820,7 +828,7 @@ with tab_overview:
             pur = cp_monthly.dropna(subset=["Avg_Purchase_Price"])
             if not pur.empty:
                 figCP.add_trace(go.Scatter(
-                    x=pur["Month"], y=pur["Avg_Purchase_Price"], name="Avg Purchase Price (€/kg)",
+                    x=pur["Month"], y=pur["Avg_Purchase_Price"], name="Avg Purchase Price — all consumed purchases, cumulative (€/kg)",
                     mode="lines+markers", line=dict(color=NAVY_LT, width=3, dash="dot"), marker=dict(size=9, symbol="diamond"),
                     hovertemplate="%{y:.4f} €/kg<extra></extra>"
                 ), secondary_y=True)
@@ -829,7 +837,7 @@ with tab_overview:
             figCP.update_yaxes(title_text="Avg Copper Price (€/kg)", secondary_y=True, showgrid=False)
             figCP.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(figCP, use_container_width=True, theme=None)
-            st.caption("Bars = net LME Balance (€, left axis) · Solid line = average sales price · Dotted line = average purchase price (€/kg, right axis)")
+            st.caption("Bars = net LME Balance (€, left axis) · Solid line = average sales price · Dotted line = cumulative average price of all consumed purchases since the first selected month (€/kg, right axis)")
         else:
             cp_row = cp_monthly.iloc[0] if not cp_monthly.empty else None
             if cp_row is not None:
