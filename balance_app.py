@@ -807,10 +807,14 @@ with tab_overview:
 
         # Cumulative weighted purchase price: ALL consumed purchases from the first selected
         # month up to each month (value / (tonnes x 1000)), not only that month's purchases.
-        _pm = (view_fix.assign(_q=pd.to_numeric(view_fix["Qty_Purchase_T"], errors="coerce").fillna(0),
-                               _v=pd.to_numeric(view_fix["Purchase_Value"], errors="coerce").fillna(0))
-               .groupby("MonthKey")[["_q", "_v"]].sum().sort_index().cumsum())
+        _raw = (view_fix.assign(_q=pd.to_numeric(view_fix["Qty_Purchase_T"], errors="coerce").fillna(0),
+                                _v=pd.to_numeric(view_fix["Purchase_Value"], errors="coerce").fillna(0))
+                .groupby("MonthKey")[["_q", "_v"]].sum().sort_index())
+        _pm = _raw.cumsum()
         _pm["Cum_Purchase_Price"] = _pm["_v"] / (_pm["_q"].where(_pm["_q"] > 0) * 1000)
+        # A month with NO consumed purchase (empty "Consumed purchase" table) shows no point at all,
+        # instead of carrying the previous cumulative value forward.
+        _pm.loc[_raw["_q"] <= 0, "Cum_Purchase_Price"] = None
         cp_monthly["Avg_Purchase_Price"] = cp_monthly["MonthKey"].map(_pm["Cum_Purchase_Price"])
 
         if len(cp_monthly) > 1:
