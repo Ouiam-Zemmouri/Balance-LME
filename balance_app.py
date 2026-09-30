@@ -613,7 +613,7 @@ groups = sorted(view["Group"].unique())
 month_order = month_map[month_map["Month"].isin(sel_m)]["Month"].tolist()
 
 # ══════════════════════ METHODOLOGY ══════════════════════
-with st.expander("📖 Methodology — What the LME Balance Is & How It's Calculated", expanded=True):
+with st.expander("📖 Methodology — What the LME Balance Is & How It's Calculated", expanded=False):
     st.markdown(f"""
 <div style="color:{INK};font-size:0.92rem;line-height:1.65;">
 
