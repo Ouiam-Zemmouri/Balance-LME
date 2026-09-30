@@ -1058,7 +1058,7 @@ with tab_stock:
                     "No stock recorded for the current selection.", "stock")
 
 with tab_purchase:
-    render_flow_tab("🛒", "Purchase Analysis", "Purchases consumed during the month and their LME price, by fixation",
+    render_flow_tab("🛒", "Purchase Consumed Analysis", "Purchases consumed during the month and their LME price, by fixation",
                     "Qty_Purchase_T", "Purchase_Value", "Qty Purchased", TEAL,
                     "No purchases consumed for the current selection.", "purchase")
 
