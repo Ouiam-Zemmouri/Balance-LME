@@ -913,7 +913,13 @@ with tab_overview:
             text=[f"€{v:,.0f}" for v in rank_df["LME_Balance_Eur"]], textposition="outside"
         ))
         figRank.add_vline(x=0, line_color="#dde3f0")
-        alay(figRank, xaxis=dict(title="LME Balance (€)"), yaxis=dict(title=""))
+        # Pad the x-axis range beyond the bars so the "outside" € labels never crowd the
+        # y-axis fixation names on the left (which happens with negative bars otherwise).
+        xmin, xmax = rank_df["LME_Balance_Eur"].min(), rank_df["LME_Balance_Eur"].max()
+        span = max(xmax - min(xmin, 0), 1)
+        alay(figRank, xaxis=dict(title="LME Balance (€)", range=[min(xmin, 0) - span * 0.22, xmax + span * 0.15]),
+             yaxis=dict(title="", automargin=True))
+        figRank.update_layout(margin=dict(l=110))
         st.plotly_chart(figRank, use_container_width=True, theme=None)
         best_fix = rank_df.iloc[-1]
         worst_fix = rank_df.iloc[0]
