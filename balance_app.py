@@ -522,12 +522,12 @@ ENT_COLOR = entity_color_map(sorted(bal_all["Entity"].unique()))
 
 # ── FILTERS (sidebar) ──
 with st.sidebar:
-    st.markdown('<p class="filter-label">🏭 Entity</p>', unsafe_allow_html=True)
+    st.markdown('<p class="filter-label">🏭 Entities</p>', unsafe_allow_html=True)
     ent_opts = sorted(bal_all["Entity"].unique())
     sel_e = st.pills("", ent_opts, selection_mode="multi", default=ent_opts,
                       key="bal_ent", label_visibility="collapsed")
 
-    st.markdown('<p class="filter-label">📅 Month</p>', unsafe_allow_html=True)
+    st.markdown('<p class="filter-label">📅 Months</p>', unsafe_allow_html=True)
     month_map = bal_all[["MonthKey","Month"]].drop_duplicates().sort_values("MonthKey")
     month_opts = month_map["Month"].tolist()
     # Compact dropdown (popover with checkboxes) instead of always-visible pills
