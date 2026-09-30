@@ -800,7 +800,7 @@ with tab_overview:
         cp_monthly = view_fix.groupby(["MonthKey","Month"]).apply(
             lambda g: pd.Series({
                 "Avg_LME_Price": (g["Qty_Sold_T"] * g["LME_Sales"]).sum() / g["Qty_Sold_T"].sum() if g["Qty_Sold_T"].sum() else 0,
-                "Avg_Purchase_Price": (g["Qty_Purchase_T"] * g["LME_Purchase"]).sum() / g["Qty_Purchase_T"].sum() if g["Qty_Purchase_T"].sum() else None,
+                "Avg_Purchase_Price": (g["Last_QTY_T"] * g["LME_Final"]).sum() / g["Last_QTY_T"].sum() if g["Last_QTY_T"].sum() else None,
                 "LME_Balance_Eur": g["LME_Balance_Eur"].sum(),
             })
         ).reset_index().sort_values("MonthKey")
@@ -823,7 +823,7 @@ with tab_overview:
             pur = cp_monthly.dropna(subset=["Avg_Purchase_Price"])
             if not pur.empty:
                 figCP.add_trace(go.Scatter(
-                    x=pur["Month"], y=pur["Avg_Purchase_Price"], name="Avg Purchase Price (€/kg)",
+                    x=pur["Month"], y=pur["Avg_Purchase_Price"], name="Avg FIFO Cost Price (€/kg)",
                     mode="lines+markers", line=dict(color=NAVY_LT, width=3, dash="dot"), marker=dict(size=9, symbol="diamond"),
                     hovertemplate="%{y:.4f} €/kg<extra></extra>"
                 ), secondary_y=True)
@@ -832,7 +832,7 @@ with tab_overview:
             figCP.update_yaxes(title_text="Avg Copper Price (€/kg)", secondary_y=True, showgrid=False)
             figCP.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(figCP, use_container_width=True, theme=None)
-            st.caption("Bars = net LME Balance (€, left axis) · Solid line = average sales price · Dotted line = average purchase price, weighted by that month's consumed purchase (€/kg, right axis)")
+            st.caption("Bars = net LME Balance (€, left axis) · Solid line = average sales price · Dotted line = average FIFO cost price — stock + purchase + reallocation combined (€/kg, right axis)")
         else:
             cp_row = cp_monthly.iloc[0] if not cp_monthly.empty else None
             if cp_row is not None:
