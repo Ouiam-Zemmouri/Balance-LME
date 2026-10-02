@@ -787,6 +787,46 @@ grp_bal     = view_fix.groupby("Group")["LME_Balance_Eur"].sum()
 n_fav       = int((grp_bal >= 0).sum())
 n_tot       = int(len(grp_bal))
 
+# ── SIDEBAR: favorable periods (under Data Coverage) ──
+with st.sidebar:
+    n_unfav = n_tot - n_fav
+    st.markdown('<p class="filter-label">🥯 Favorable Periods</p>', unsafe_allow_html=True)
+    if n_tot == 0:
+        st.caption("No period in the current selection.")
+    else:
+        figA2 = go.Figure(go.Pie(
+            labels=["Favorable", "Unfavorable"], values=[n_fav, n_unfav], hole=0.62,
+            marker=dict(colors=[TEAL, ROSE], line=dict(color="#ffffff", width=3)),
+            textinfo="value", textfont=dict(color="#ffffff", size=12), sort=False
+        ))
+        alay(figA2, showlegend=True, height=250,
+             legend=dict(orientation="h", yanchor="top", y=-0.02, xanchor="center", x=0.5),
+             annotations=[dict(text=f"{n_fav}/{n_tot}", x=0.5, y=0.5,
+                               font=dict(size=15, color=bal_color, family="Inter"), showarrow=False)])
+        figA2.update_layout(margin=dict(l=8, r=8, t=8, b=30))
+        st.plotly_chart(figA2, use_container_width=True, theme=None)
+
+        if st.button(f"✅ Favorable ({n_fav})", use_container_width=True, key="btn_fav"):
+            st.session_state["fav_filter"] = None if st.session_state.get("fav_filter") == "Favorable" else "Favorable"
+        if st.button(f"⚠️ Unfavorable ({n_unfav})", use_container_width=True, key="btn_unfav"):
+            st.session_state["fav_filter"] = None if st.session_state.get("fav_filter") == "Unfavorable" else "Unfavorable"
+
+        sel_label = st.session_state.get("fav_filter")
+        if sel_label in ("Favorable", "Unfavorable"):
+            want_fav = (sel_label == "Favorable")
+            matches = grp_bal[grp_bal >= 0] if want_fav else grp_bal[grp_bal < 0]
+            matches = matches.sort_values(ascending=not want_fav)
+            st.caption(f"{sel_label} periods — {len(matches)} entity × month (click the button again to hide)")
+            detail = matches.reset_index()
+            detail.columns = ["Entity × Month", "LME Balance (€)"]
+            st.dataframe(
+                detail.style.format({"LME Balance (€)": "€{:,.0f}"})
+                    .set_properties(**{"background-color": "#ffffff", "color": INK})
+                    .map(lambda v: "color:#0d9488;font-weight:700" if isinstance(v, (int, float)) and v >= 0
+                         else "color:#e11d48;font-weight:700", subset=["LME Balance (€)"]),
+                use_container_width=True, hide_index=True, height=min(38 * len(detail) + 40, 300)
+            )
+
 monthly = view_fix.groupby("MonthKey")[["Sales_Value","LME_Balance_Eur","Qty_Sold_T"]].sum().sort_index()
 spark_balance = monthly["LME_Balance_Eur"].tolist() if len(monthly) > 1 else None
 spark_qty     = monthly["Qty_Sold_T"].tolist()      if len(monthly) > 1 else None
@@ -885,70 +925,6 @@ with tab_overview:
             if cp_row is not None:
                 st.metric("Avg Copper Price this period (€/kg)", f"{cp_row['Avg_LME_Price']:.4f}")
             st.caption("Add more monthly files to see how the copper price and the balance move together over time.")
-
-    rowA1, rowA2 = st.columns([5,3])
-
-    with rowA1:
-        with st.container(border=True):
-            sec("📅","Net LME Balance — Trend", "Monthly evolution by entity")
-            trend = (view_tot.groupby(["Entity","MonthKey","Month"])["LME_Balance_Eur"]
-                     .sum().reset_index().sort_values("MonthKey"))
-            if trend["MonthKey"].nunique() > 1:
-                figA1 = px.line(trend, x="Month", y="LME_Balance_Eur", color="Entity",
-                                 markers=True, category_orders={"Month": month_order},
-                                 color_discrete_map=ENT_COLOR)
-                figA1.update_traces(line=dict(width=3), marker=dict(size=9))
-                figA1.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
-                alay(figA1, showlegend=len(sel_e) > 1, height=480,
-                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None),
-                     yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
-                st.plotly_chart(figA1, use_container_width=True, theme=None)
-            else:
-                figA1 = px.bar(view_tot, x="Entity", y="LME_Balance_Eur", color="Entity",
-                                color_discrete_map=ENT_COLOR, text_auto=",.0f")
-                figA1.add_hline(y=0, line_dash="dot", line_color="#dde3f0")
-                alay(figA1, showlegend=False, height=480, yaxis=dict(title="LME Balance (€)"), xaxis=dict(title=""))
-                st.plotly_chart(figA1, use_container_width=True, theme=None)
-                st.caption("Add more monthly files to unlock the trend view.")
-
-    with rowA2:
-        with st.container(border=True):
-            sec("🥯","How Many Periods Were Favorable?", "Click a button below to see which entity × month")
-            n_unfav = n_tot - n_fav
-            figA2 = go.Figure(go.Pie(
-                labels=["Favorable", "Unfavorable"], values=[n_fav, n_unfav], hole=0.62,
-                marker=dict(colors=[TEAL, ROSE], line=dict(color="#ffffff", width=3)),
-                textinfo="value", textfont=dict(color="#ffffff", size=13), sort=False
-            ))
-            alay(figA2, showlegend=True, height=480,
-                 legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
-                 annotations=[dict(text=f"{n_fav}/{n_tot}", x=0.5, y=0.5,
-                                    font=dict(size=17, color=bal_color, family="Inter"), showarrow=False)])
-            st.plotly_chart(figA2, use_container_width=True, theme=None)
-
-            bc1, bc2 = st.columns(2)
-            if bc1.button(f"✅ Favorable ({n_fav})", use_container_width=True, key="btn_fav"):
-                st.session_state["fav_filter"] = None if st.session_state.get("fav_filter") == "Favorable" else "Favorable"
-            if bc2.button(f"⚠️ Unfavorable ({n_unfav})", use_container_width=True, key="btn_unfav"):
-                st.session_state["fav_filter"] = None if st.session_state.get("fav_filter") == "Unfavorable" else "Unfavorable"
-
-    sel_label = st.session_state.get("fav_filter")
-    if sel_label in ("Favorable", "Unfavorable"):
-        want_fav = (sel_label == "Favorable")
-        matches = grp_bal[grp_bal >= 0] if want_fav else grp_bal[grp_bal < 0]
-        matches = matches.sort_values(ascending=not want_fav)
-        with st.container(border=True):
-            icon = "✅" if want_fav else "⚠️"
-            sec(icon, f"{sel_label} periods — {len(matches)} entity × month", "Click the same button again to hide this")
-            detail = matches.reset_index()
-            detail.columns = ["Entity × Month", "LME Balance (€)"]
-            st.dataframe(
-                detail.style.format({"LME Balance (€)":"€{:,.0f}"})
-                    .set_properties(**{"background-color":"#ffffff","color":INK})
-                    .map(lambda v:"color:#0d9488;font-weight:700" if isinstance(v,(int,float)) and v>=0
-                         else "color:#e11d48;font-weight:700", subset=["LME Balance (€)"]),
-                use_container_width=True, hide_index=True, height=min(38*len(detail)+40, 300)
-            )
 
     with st.container(border=True):
         sec("🏆","Which Fixation Wins or Loses the Most?", "Ranked by net LME Balance across the current selection")
