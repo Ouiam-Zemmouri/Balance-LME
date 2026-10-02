@@ -1186,13 +1186,22 @@ def _stack_bar(parts, height=34, show_text=True):
 
 with tab_supply:
     sup = view_fix.copy()
-    for c in ["Qty_Stock_T","Qty_Purchase_T","Qty_Sold_T","Stock_Value","Purchase_Value","Sales_Value"]:
+    for c in ["Qty_Stock_T","Qty_Purchase_T","Qty_Sold_T","Stock_Value","Purchase_Value","Sales_Value",
+              "Tbl_Stock_T","Tbl_Stock_Value","Tbl_Purch_T","Tbl_Purch_Value"]:
         sup[c] = pd.to_numeric(sup[c], errors="coerce").fillna(0)
-    sup["Supply_T"] = sup["Qty_Stock_T"] + sup["Qty_Purchase_T"]
-    sup["Supply_Value"] = sup["Stock_Value"] + sup["Purchase_Value"]
+    # FIFO view: only what the balance calculation consumed
+    sup["Fifo_T"] = sup["Qty_Stock_T"] + sup["Qty_Purchase_T"]
+    sup["Fifo_Value"] = sup["Stock_Value"] + sup["Purchase_Value"]
+    # Real view: full totals of the file tables (stock by LME fixations + consumed purchase)
+    sup["Supply_T"] = sup["Tbl_Stock_T"] + sup["Tbl_Purch_T"]
+    sup["Supply_Value"] = sup["Tbl_Stock_Value"] + sup["Tbl_Purch_Value"]
+    supply_from_tables = sup["Supply_T"].sum() > 0
+    if not supply_from_tables:      # files without the tables: fall back to the FIFO figures
+        sup["Supply_T"], sup["Supply_Value"] = sup["Fifo_T"], sup["Fifo_Value"]
 
-    g = sup.groupby("Fixation")[["Supply_T","Supply_Value","Qty_Sold_T","Sales_Value"]].sum().reset_index()
+    g = sup.groupby("Fixation")[["Supply_T","Supply_Value","Fifo_T","Fifo_Value","Qty_Sold_T","Sales_Value"]].sum().reset_index()
     g["Supply_LME"] = g["Supply_Value"] / (g["Supply_T"].where(g["Supply_T"] > 0) * 1000)
+    g["Fifo_LME"]   = g["Fifo_Value"]   / (g["Fifo_T"].where(g["Fifo_T"] > 0) * 1000)
     g["Sales_LME"]  = g["Sales_Value"]  / (g["Qty_Sold_T"].where(g["Qty_Sold_T"] > 0) * 1000)
     g["Gap_T"] = g["Supply_T"] - g["Qty_Sold_T"]
     FIX_ORDER2 = {"M-1": 0, "3M-1": 1, "3M-2": 2}
@@ -1200,6 +1209,7 @@ with tab_supply:
     g = g.sort_values("_ord").drop(columns="_ord").reset_index(drop=True)
 
     T_supply, T_sold2 = g["Supply_T"].sum(), g["Qty_Sold_T"].sum()
+    T_fifo = g["Fifo_T"].sum()
     T_supply_val, T_sales_val = g["Supply_Value"].sum(), g["Sales_Value"].sum()
     coverage = _pc(T_supply, T_sold2) if T_sold2 else 0
     gap = T_supply - T_sold2
@@ -1210,21 +1220,32 @@ with tab_supply:
         cover_color = TEAL if coverage >= 100 else ROSE
 
         c1, c2, c3, c4 = st.columns(4)
-        kpi(c1, "📥", "Total Supply", f"{T_supply:,.0f} T", NAVY_LT, f"Stock + purchases · €{fmt_compact(T_supply_val)}")
+        kpi(c1, "📥", "Total Supply", f"{T_supply:,.0f} T", NAVY_LT, f"Stock + purchases (file tables) · €{fmt_compact(T_supply_val)}"
+            if supply_from_tables else f"Stock + purchases · €{fmt_compact(T_supply_val)}")
         kpi(c2, "📤", "Total Sold", f"{T_sold2:,.0f} T", COPPER, f"€{fmt_compact(T_sales_val)}")
         kpi(c3, "🎯", "Coverage", f"{coverage:.0f}%", cover_color, "Supply vs sales, by tonnage")
         kpi(c4, "⚖️", "Net Gap", f"{gap:+,.0f} T", TEAL if gap >= 0 else ROSE,
             "Surplus left unsold" if gap >= 0 else "Covered by reallocation")
+        if supply_from_tables:
+            st.caption(f"Supply = full totals of the file tables (Stock by LME fixations + Consumed purchase). "
+                       f"Of which consumed in the FIFO balance: {T_fifo:,.0f} T.")
+        else:
+            st.caption("File tables not found for this selection — supply shown as consumed in the FIFO balance.")
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
-        gv = g[(g["Supply_T"] > 0) | (g["Qty_Sold_T"] > 0)].reset_index(drop=True)
+        gv = g[(g["Supply_T"] > 0) | (g["Qty_Sold_T"] > 0) | (g["Fifo_T"] > 0)].reset_index(drop=True)
 
         with st.container(border=True):
             sec("📊", "Supply vs Sales, by Fixation", "Tonnage supplied (stock + purchases) against tonnage sold, with average LME price")
             figSV = go.Figure()
-            figSV.add_trace(go.Bar(x=gv["Fixation"], y=gv["Supply_T"], name="Supply (Stock+Purchase)",
+            figSV.add_trace(go.Bar(x=gv["Fixation"], y=gv["Supply_T"],
+                                    name="Supply (Stock+Purchase, file tables)" if supply_from_tables else "Supply (Stock+Purchase)",
                                     marker_color=NAVY_LT, opacity=0.85,
                                     hovertemplate="%{y:,.1f} T<extra></extra>"))
+            if supply_from_tables:
+                figSV.add_trace(go.Bar(x=gv["Fixation"], y=gv["Fifo_T"], name="Of which consumed in FIFO",
+                                        marker_color=TEAL, opacity=0.85,
+                                        hovertemplate="%{y:,.1f} T<extra></extra>"))
             figSV.add_trace(go.Bar(x=gv["Fixation"], y=gv["Qty_Sold_T"], name="Sold",
                                     marker_color=COPPER, opacity=0.85,
                                     hovertemplate="%{y:,.1f} T<extra></extra>"))
@@ -1238,6 +1259,9 @@ with tab_supply:
             figP = go.Figure()
             figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Supply_LME"], name="Supply LME (€/kg)",
                                    marker_color=NAVY_LT, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
+            if supply_from_tables:
+                figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Fifo_LME"], name="FIFO consumed LME (€/kg)",
+                                       marker_color=TEAL, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
             figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Sales_LME"], name="Sales LME (€/kg)",
                                    marker_color=COPPER, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
             alay(figP, barmode="group", height=380,
@@ -1247,11 +1271,12 @@ with tab_supply:
 
         with st.container(border=True):
             sec("📋", "Detail by Fixation", "Supply, sales, prices and coverage — aggregated across the current selection")
-            det = gv[["Fixation","Supply_T","Supply_LME","Qty_Sold_T","Sales_LME","Gap_T"]].copy()
+            det = gv[["Fixation","Supply_T","Supply_LME","Fifo_T","Fifo_LME","Qty_Sold_T","Sales_LME","Gap_T"]].copy()
             det["Coverage %"] = det.apply(lambda r: _pc(r["Supply_T"], r["Qty_Sold_T"]) if r["Qty_Sold_T"] else None, axis=1)
-            det.columns = ["Fixation","Supply (T)","Supply LME (€/kg)","Sold (T)","Sales LME (€/kg)","Gap (T)","Coverage %"]
-            det_fmt = {"Supply (T)":"{:,.1f}","Sold (T)":"{:,.1f}","Gap (T)":"{:+,.1f}",
-                       "Supply LME (€/kg)":"{:.4f}","Sales LME (€/kg)":"{:.4f}","Coverage %":"{:.0f}%"}
+            det.columns = ["Fixation","Supply (T)","Supply LME (€/kg)","FIFO consumed (T)","FIFO LME (€/kg)",
+                           "Sold (T)","Sales LME (€/kg)","Gap (T)","Coverage %"]
+            det_fmt = {"Supply (T)":"{:,.1f}","FIFO consumed (T)":"{:,.1f}","Sold (T)":"{:,.1f}","Gap (T)":"{:+,.1f}",
+                       "Supply LME (€/kg)":"{:.4f}","FIFO LME (€/kg)":"{:.4f}","Sales LME (€/kg)":"{:.4f}","Coverage %":"{:.0f}%"}
             st.dataframe(
                 det.style.format(det_fmt, na_rep="—")
                    .set_properties(**{"background-color": "#ffffff", "color": INK}),
