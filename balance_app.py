@@ -399,8 +399,13 @@ def parse_file_tables(ws):
             if fix is None or str(fix).strip() == "" or pd.isna(qty) or qty == 0:
                 continue
             fix = str(fix).strip()
+            px = 0.0 if pd.isna(px) else float(px)
+            # Unit safety: the app expects this LME fixing in EUR/T (e.g. 10741). Some files give it
+            # in EUR/kg (e.g. 10.74) -> convert to EUR/T so value = qty(T) x EUR/T stays correct.
+            if 0 < px < 100:
+                px *= 1000
             q0, v0 = out[key].get(fix, (0.0, 0.0))
-            out[key][fix] = (q0 + float(qty), v0 + float(qty) * (0.0 if pd.isna(px) else float(px)))
+            out[key][fix] = (q0 + float(qty), v0 + float(qty) * px)
     return out
 
 def parse_lme_balance_file(path):
