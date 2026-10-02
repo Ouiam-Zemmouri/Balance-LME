@@ -366,6 +366,42 @@ MONTH_NUM_MAP = {"01":"Jan","02":"Feb","03":"Mar","04":"Apr","05":"May","06":"Ju
                   "07":"Jul","08":"Aug","09":"Sep","10":"Oct","11":"Nov","12":"Dec"}
 BALANCE_FOLDER = "balance_files"
 
+def _txt(v):
+    return str(v).strip().lower() if v is not None else ""
+
+def parse_file_tables(ws):
+    """Read the two tables of the 'Second step of the analysis' block of a monthly file:
+         - 'Stock dd.mm.yyyy by LME fixations'   (Qty T + LME fixing in EUR/T)
+         - 'Consumed purchase mm.yyyy'           (Qty T + LME fixing in EUR/T)
+    Returns {table_key: {fixation: (qty_T, value_EUR)}}. Rows are located by their title, not by
+    a fixed cell address, so a shifted layout (with or without the 'Reliquat' block) still works.
+    Any 'Reliquat' rows sitting between the first TOTAL and the Gross TOTAL are added per fixation."""
+    out = {"stock": {}, "purch": {}}
+    titles = {}
+    for r in range(1, ws.max_row + 1):
+        for c in (2, 3):
+            t = _txt(ws.cell(r, c).value)
+            if t.startswith("stock") and "lme" in t and "stock" not in titles:
+                titles["stock"] = r
+            elif t.startswith("consumed purchase") and "purch" not in titles:
+                titles["purch"] = r
+    for key, r0 in titles.items():
+        for r in range(r0 + 1, min(r0 + 16, ws.max_row) + 1):
+            c_txt, d_txt = _txt(ws.cell(r, 3).value), _txt(ws.cell(r, 4).value)
+            if c_txt.startswith("gross total") or d_txt.startswith("gross total"):
+                break
+            if c_txt.startswith(("consumed", "stock")):      # next table title reached
+                break
+            fix = ws.cell(r, 4).value
+            qty = pd.to_numeric(ws.cell(r, 5).value, errors="coerce")
+            px  = pd.to_numeric(ws.cell(r, 6).value, errors="coerce")
+            if fix is None or str(fix).strip() == "" or pd.isna(qty) or qty == 0:
+                continue
+            fix = str(fix).strip()
+            q0, v0 = out[key].get(fix, (0.0, 0.0))
+            out[key][fix] = (q0 + float(qty), v0 + float(qty) * (0.0 if pd.isna(px) else float(px)))
+    return out
+
 def parse_lme_balance_file(path):
     """Parse one monthly 'LME balance calculation under FIFO method' Excel file."""
     fname = os.path.basename(path)
@@ -420,6 +456,17 @@ def parse_lme_balance_file(path):
     df_bal = pd.DataFrame(rows)
     num_cols = [c for c in df_bal.columns if c != "Fixation"]
     df_bal[num_cols] = df_bal[num_cols].apply(pd.to_numeric, errors="coerce")
+
+    # Totals taken from the file's own "by LME fixations" tables (full table, not only what the
+    # FIFO balance consumed). Matched to the balance rows by fixation name; TOTAL row = sum.
+    tbl = parse_file_tables(ws)
+    is_tot = df_bal["Fixation"].str.upper() == "TOTAL"
+    for key, qcol, vcol in [("stock", "Tbl_Stock_T", "Tbl_Stock_Value"),
+                            ("purch", "Tbl_Purch_T", "Tbl_Purch_Value")]:
+        df_bal[qcol] = df_bal["Fixation"].map(lambda f: tbl[key].get(f, (0.0, 0.0))[0]).astype(float)
+        df_bal[vcol] = df_bal["Fixation"].map(lambda f: tbl[key].get(f, (0.0, 0.0))[1]).astype(float)
+        df_bal.loc[is_tot, qcol] = df_bal.loc[~is_tot, qcol].sum()
+        df_bal.loc[is_tot, vcol] = df_bal.loc[~is_tot, vcol].sum()
 
     m = re.search(r'COF[\s_-]*([A-Za-z]+).*?(\d{1,2})[\s._-](\d{4})', fname)
     if m:
@@ -963,9 +1010,13 @@ def wavg(df, qty_col, val_col):
     q, v = df[qty_col].sum(), df[val_col].sum()
     return q, v, (v / (q * 1000) if q > 0 else None)
 
-def combo_fixation_chart(agg, qty_name, bar_color):
+def combo_fixation_chart(agg, qty_name, bar_color, tbl_name=None):
     line_color = NAVY_MD if bar_color == COPPER else COPPER
     fig = make_subplots(specs=[[{"secondary_y": True}]])
+    if tbl_name:
+        fig.add_trace(go.Bar(
+            x=agg["Fixation"], y=agg["TQty"], name=tbl_name, marker_color=NAVY_MD, opacity=0.55,
+            text=[f"{v:,.1f}" for v in agg["TQty"]], textposition="outside"), secondary_y=False)
     fig.add_trace(go.Bar(
         x=agg["Fixation"], y=agg["Qty"], name=qty_name, marker_color=bar_color, opacity=0.85,
         text=[f"{v:,.1f}" for v in agg["Qty"]], textposition="outside"), secondary_y=False)
@@ -977,22 +1028,53 @@ def combo_fixation_chart(agg, qty_name, bar_color):
     fig.update_yaxes(title_text="LME (€/kg)", secondary_y=True, showgrid=False)
     return fig
 
-def analysis_section(icon, title, sub, df, qty_col, val_col, qty_name, color, empty_msg):
+def analysis_section(icon, title, sub, df, qty_col, val_col, qty_name, color, empty_msg,
+                     tbl_qty_col=None, tbl_val_col=None, tbl_name=None):
     with st.container(border=True):
         sec(icon, title, sub)
         q, v, p = wavg(df, qty_col, val_col)
-        if q <= 0:
+        tq, tv, tp = wavg(df, tbl_qty_col, tbl_val_col) if tbl_qty_col else (0, 0, None)
+        if q <= 0 and tq <= 0:
             st.info(empty_msg)
             return
-        c1, c2, c3 = st.columns(3)
-        kpi(c1, "📦", qty_name, f"{q:,.1f} T", color)
-        kpi(c2, "🔶", "Weighted Avg LME", f"{p:.4f} €/kg", COPPER)
-        kpi(c3, "💶", "Total Value", f"€{fmt_compact(v)}", NAVY_MD)
+        if tbl_qty_col:
+            st.markdown(f"**{qty_name} — consumed in the balance calculation**")
+        if q > 0:
+            c1, c2, c3 = st.columns(3)
+            kpi(c1, "📦", qty_name, f"{q:,.1f} T", color)
+            kpi(c2, "🔶", "Weighted Avg LME", f"{p:.4f} €/kg", COPPER)
+            kpi(c3, "💶", "Total Value", f"€{fmt_compact(v)}", NAVY_MD)
+        else:
+            st.caption("Nothing consumed in the balance calculation for this selection.")
+        if tbl_qty_col:
+            st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+            st.markdown(f"**{tbl_name} — total of the file table**")
+            if tq > 0:
+                t1, t2, t3, t4 = st.columns(4)
+                kpi(t1, "📋", "Table Total", f"{tq:,.1f} T", NAVY_MD)
+                kpi(t2, "🔶", "Weighted Avg LME", f"{tp:.4f} €/kg", COPPER)
+                kpi(t3, "💶", "Total Value", f"€{fmt_compact(tv)}", NAVY_MD)
+                kpi(t4, "↔️", "Table − Consumed", f"{tq - q:+,.1f} T", color)
+            else:
+                st.caption("The file table is empty for this selection.")
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
         agg = flow_agg(df, qty_col, val_col)
+        if tbl_qty_col:
+            tagg = flow_agg(df, tbl_qty_col, tbl_val_col).rename(
+                columns={"Qty": "TQty", "Value": "TValue", "LME": "TLME"})
+            agg = agg.merge(tagg, on="Fixation", how="outer").fillna({"Qty": 0, "TQty": 0, "Value": 0, "TValue": 0})
+            agg = agg[(agg["Qty"] > 0) | (agg["TQty"] > 0)]
+        else:
+            agg = agg[agg["Qty"] > 0]
+        fig_c = combo_fixation_chart(agg, qty_name, color, tbl_name if tbl_qty_col else None)
+        if tbl_qty_col:
+            fig_c.add_trace(go.Scatter(
+                x=agg["Fixation"], y=agg["TLME"], name="Avg LME — table (€/kg)", mode="lines+markers",
+                line=dict(color=NAVY_MD, width=2, dash="dot"), marker=dict(size=8)), secondary_y=True)
+        st.plotly_chart(fig_c, use_container_width=True, theme=None)
         agg = agg[agg["Qty"] > 0]
-        st.plotly_chart(combo_fixation_chart(agg, qty_name, color),
-                        use_container_width=True, theme=None)
+        if agg.empty:
+            return
         top = agg.loc[agg["Qty"].idxmax()]
         lo, hi = agg.loc[agg["LME"].idxmin()], agg.loc[agg["LME"].idxmax()]
         note = (f"**{top['Fixation']}** carries the largest quantity "
@@ -1002,17 +1084,22 @@ def analysis_section(icon, title, sub, df, qty_col, val_col, qty_name, color, em
                      f"highest LME: **{hi['Fixation']}** ({hi['LME']:.4f} €/kg).")
         st.caption(note)
 
-def flow_evolution_chart(df, qty_col, val_col, qty_name, color):
+def flow_evolution_chart(df, qty_col, val_col, qty_name, color, tbl_qty_col=None, tbl_name=None):
     line_color = NAVY_MD if color == COPPER else COPPER
     rows = []
     for mk, g in df.groupby("MonthKey"):
         q, v, p = wavg(g, qty_col, val_col)
-        rows.append({"MonthKey": mk, "Month": g["Month"].iloc[0], "Qty": q, "LME": p})
+        tq = g[tbl_qty_col].sum() if tbl_qty_col else 0
+        rows.append({"MonthKey": mk, "Month": g["Month"].iloc[0], "Qty": q, "LME": p, "TQty": tq})
     ev = pd.DataFrame(rows).sort_values("MonthKey")
-    ev = ev[ev["Qty"] > 0]
+    ev = ev[(ev["Qty"] > 0) | (ev["TQty"] > 0)]
     if ev.empty:
         return None
     fig = make_subplots(specs=[[{"secondary_y": True}]])
+    if tbl_qty_col:
+        fig.add_trace(go.Bar(
+            x=ev["Month"], y=ev["TQty"], name=tbl_name, marker_color=NAVY_MD, opacity=0.55,
+            text=[f"{v:,.0f}" for v in ev["TQty"]], textposition="outside"), secondary_y=False)
     fig.add_trace(go.Bar(
         x=ev["Month"], y=ev["Qty"], name=qty_name, marker_color=color, opacity=0.85,
         text=[f"{v:,.0f}" for v in ev["Qty"]], textposition="outside"), secondary_y=False)
@@ -1024,26 +1111,39 @@ def flow_evolution_chart(df, qty_col, val_col, qty_name, color):
     fig.update_yaxes(title_text="LME (€/kg)", secondary_y=True, showgrid=False)
     return fig
 
-def render_flow_tab(icon, title, sub, qty_col, val_col, qty_name, color, empty_msg, key):
-    analysis_section(icon, title, sub, view_fix, qty_col, val_col, qty_name, color, empty_msg)
-    if view_fix[qty_col].sum() <= 0:
+def render_flow_tab(icon, title, sub, qty_col, val_col, qty_name, color, empty_msg, key,
+                    tbl_qty_col=None, tbl_val_col=None, tbl_name=None):
+    analysis_section(icon, title, sub, view_fix, qty_col, val_col, qty_name, color, empty_msg,
+                     tbl_qty_col, tbl_val_col, tbl_name)
+    if view_fix[qty_col].sum() <= 0 and (not tbl_qty_col or view_fix[tbl_qty_col].sum() <= 0):
         return
 
     if view_fix["MonthKey"].nunique() > 1:
         with st.container(border=True):
             sec("📈", f"{qty_name} & LME Price by Month", "Monthly quantity (bars) and weighted average LME (line)")
-            figEV = flow_evolution_chart(view_fix, qty_col, val_col, qty_name, color)
+            figEV = flow_evolution_chart(view_fix, qty_col, val_col, qty_name, color, tbl_qty_col, tbl_name)
             if figEV is not None:
                 st.plotly_chart(figEV, use_container_width=True, theme=None)
 
     with st.container(border=True):
         sec("📋", "Detail by Fixation", "Aggregated across the current selection")
         d = flow_agg(view_fix, qty_col, val_col)
-        d["Share"] = d["Qty"] / d["Qty"].sum() * 100
-        d = d.sort_values("Fixation")[["Fixation", "Qty", "LME", "Value", "Share"]]
-        d.columns = ["Fixation", f"{qty_name} (T)", "LME (€/kg)", "Value (€)", "Share of Qty (%)"]
+        d["Share"] = d["Qty"] / d["Qty"].sum() * 100 if d["Qty"].sum() > 0 else 0.0
+        cols = ["Fixation", "Qty", "LME", "Value", "Share"]
+        names = ["Fixation", f"{qty_name} (T)", "LME (€/kg)", "Value (€)", "Share of Qty (%)"]
         d_fmt = {f"{qty_name} (T)": "{:,.1f}", "LME (€/kg)": "{:.4f}",
                  "Value (€)": "€{:,.0f}", "Share of Qty (%)": "{:.1f}%"}
+        if tbl_qty_col:
+            t = flow_agg(view_fix, tbl_qty_col, tbl_val_col).rename(
+                columns={"Qty": "TQty", "Value": "TValue", "LME": "TLME"})
+            d = d.merge(t, on="Fixation", how="outer").fillna({"Qty": 0, "Value": 0, "Share": 0, "TQty": 0, "TValue": 0})
+            d["Gap"] = d["TQty"] - d["Qty"]
+            cols += ["TQty", "TLME", "TValue", "Gap"]
+            names += ["Table Total (T)", "Table LME (€/kg)", "Table Value (€)", "Table − Consumed (T)"]
+            d_fmt.update({"Table Total (T)": "{:,.1f}", "Table LME (€/kg)": "{:.4f}",
+                          "Table Value (€)": "€{:,.0f}", "Table − Consumed (T)": "{:+,.1f}"})
+        d = d.sort_values("Fixation")[cols]
+        d.columns = names
         st.dataframe(
             d.style.format(d_fmt, na_rep="—")
                .set_properties(**{"background-color": "#ffffff", "color": INK}),
@@ -1052,12 +1152,14 @@ def render_flow_tab(icon, title, sub, qty_col, val_col, qty_name, color, empty_m
 with tab_stock:
     render_flow_tab("📦", "Stock Analysis", "Opening stock carried over from the previous month, by fixation",
                     "Qty_Stock_T", "Stock_Value", "Qty Stock", NAVY_LT,
-                    "No stock recorded for the current selection.", "stock")
+                    "No stock recorded for the current selection.", "stock",
+                    "Tbl_Stock_T", "Tbl_Stock_Value", "Stock table (by LME fixations)")
 
 with tab_purchase:
     render_flow_tab("🛒", "Purchase Consumed Analysis", "Purchases consumed during the month and their LME price, by fixation",
                     "Qty_Purchase_T", "Purchase_Value", "Qty Purchased", TEAL,
-                    "No purchases consumed for the current selection.", "purchase")
+                    "No purchases consumed for the current selection.", "purchase",
+                    "Tbl_Purch_T", "Tbl_Purch_Value", "Consumed purchase table")
 
 def _pc(a, b):
     return (a / b * 100) if b else 0.0
