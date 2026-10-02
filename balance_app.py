@@ -1239,7 +1239,7 @@ with tab_supply:
             sec("📊", "Supply vs Sales, by Fixation", "Tonnage supplied (stock + purchases) against tonnage sold, with average LME price")
             figSV = go.Figure()
             figSV.add_trace(go.Bar(x=gv["Fixation"], y=gv["Supply_T"],
-                                    name="Supply (Stock+Purchase, file tables)" if supply_from_tables else "Supply (Stock+Purchase)",
+                                    name="Supply (Stock+Purchase)",
                                     marker_color=NAVY_LT, opacity=0.85,
                                     hovertemplate="%{y:,.1f} T<extra></extra>"))
             if supply_from_tables:
