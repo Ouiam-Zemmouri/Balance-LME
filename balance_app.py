@@ -1006,9 +1006,12 @@ def combo_fixation_chart(agg, qty_name, bar_color, tbl_name=None):
         x=agg["Fixation"], y=agg["Qty"], name=qty_name, marker_color=bar_color, opacity=0.85,
         text=[f"{v:,.1f}" for v in agg["Qty"]], textposition="outside"), secondary_y=False)
     fig.add_trace(go.Scatter(
-        x=agg["Fixation"], y=agg["LME"], name="Avg LME (€/kg)", mode="lines+markers",
+        x=agg["Fixation"], y=agg["LME"],
+        name=(f"Avg LME — {qty_name} (€/kg)" if tbl_name else "Avg LME (€/kg)"), mode="lines+markers",
         line=dict(color=line_color, width=3), marker=dict(size=10)), secondary_y=True)
-    alay(fig, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+    # legend sits above the plot, left-aligned on its own row(s) so it never collides with the chart toolbar
+    alay(fig, legend=dict(orientation="h", yanchor="bottom", y=1.12, xanchor="left", x=0,
+                          font=dict(size=11), tracegroupgap=6))
     fig.update_yaxes(title_text="Quantity (T)", secondary_y=False, gridcolor="#f0f2f8")
     fig.update_yaxes(title_text="LME (€/kg)", secondary_y=True, showgrid=False)
     return fig
