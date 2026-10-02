@@ -1048,7 +1048,7 @@ def analysis_section(icon, title, sub, df, qty_col, val_col, qty_name, color, em
             st.caption("Nothing consumed in the balance calculation for this selection.")
         if tbl_qty_col:
             st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-            st.markdown(f"**{tbl_name} — total of the file table**")
+            st.markdown(f"**{tbl_name} — total**")
             if tq > 0:
                 t1, t2, t3, t4 = st.columns(4)
                 kpi(t1, "📋", "Table Total", f"{tq:,.1f} T", NAVY_MD)
@@ -1056,7 +1056,7 @@ def analysis_section(icon, title, sub, df, qty_col, val_col, qty_name, color, em
                 kpi(t3, "💶", "Total Value", f"€{fmt_compact(tv)}", NAVY_MD)
                 kpi(t4, "↔️", "Table − Consumed", f"{tq - q:+,.1f} T", color)
             else:
-                st.caption("The file table is empty for this selection.")
+                st.caption("The table is empty for this selection.")
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
         agg = flow_agg(df, qty_col, val_col)
         if tbl_qty_col:
