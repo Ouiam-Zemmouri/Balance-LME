@@ -489,8 +489,10 @@ def parse_lme_balance_file(path):
     df_bal.insert(3, "SourceFile", fname)
     return df_bal, None
 
+PARSER_VERSION = 2   # bump this number whenever the parsing code changes -> forces a fresh load (cache key)
+
 @st.cache_data(ttl=3600)
-def load_all_balance_files():
+def load_all_balance_files(parser_version=PARSER_VERSION):
     """Auto-load every .xlsx bundled in the balance_files/ folder of the repo."""
     files = sorted(
         f for f in glob.glob(os.path.join(BALANCE_FOLDER, "*.xlsx"))
@@ -555,7 +557,7 @@ with st.sidebar:
         st.rerun()
     st.markdown("---")
 
-bal_all, errors = load_all_balance_files()
+bal_all, errors = load_all_balance_files(PARSER_VERSION)
 for e in errors:
     st.warning(e)
 
