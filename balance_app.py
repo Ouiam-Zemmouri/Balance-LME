@@ -1048,15 +1048,15 @@ def analysis_section(icon, title, sub, df, qty_col, val_col, qty_name, color, em
             st.caption("Nothing consumed in the balance calculation for this selection.")
         if tbl_qty_col:
             st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-            st.markdown(f"**{tbl_name} — total**")
+            st.markdown(f"**{tbl_name}**")
             if tq > 0:
                 t1, t2, t3, t4 = st.columns(4)
-                kpi(t1, "📋", "Table Total", f"{tq:,.1f} T", NAVY_MD)
+                kpi(t1, "📋", "Total Qty", f"{tq:,.1f} T", NAVY_MD)
                 kpi(t2, "🔶", "Weighted Avg LME", f"{tp:.4f} €/kg", COPPER)
                 kpi(t3, "💶", "Total Value", f"€{fmt_compact(tv)}", NAVY_MD)
-                kpi(t4, "↔️", "Table − Consumed", f"{tq - q:+,.1f} T", color)
+                kpi(t4, "↔️", "Total − Consumed", f"{tq - q:+,.1f} T", color)
             else:
-                st.caption("The table is empty for this selection.")
+                st.caption(f"No {tbl_name.lower()} for this selection.")
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
         agg = flow_agg(df, qty_col, val_col)
         if tbl_qty_col:
@@ -1069,7 +1069,7 @@ def analysis_section(icon, title, sub, df, qty_col, val_col, qty_name, color, em
         fig_c = combo_fixation_chart(agg, qty_name, color, tbl_name if tbl_qty_col else None)
         if tbl_qty_col:
             fig_c.add_trace(go.Scatter(
-                x=agg["Fixation"], y=agg["TLME"], name="Avg LME — table (€/kg)", mode="lines+markers",
+                x=agg["Fixation"], y=agg["TLME"], name=f"Avg LME — {tbl_name} (€/kg)", mode="lines+markers",
                 line=dict(color=NAVY_MD, width=2, dash="dot"), marker=dict(size=8)), secondary_y=True)
         st.plotly_chart(fig_c, use_container_width=True, theme=None)
         agg = agg[agg["Qty"] > 0]
@@ -1139,9 +1139,9 @@ def render_flow_tab(icon, title, sub, qty_col, val_col, qty_name, color, empty_m
             d = d.merge(t, on="Fixation", how="outer").fillna({"Qty": 0, "Value": 0, "Share": 0, "TQty": 0, "TValue": 0})
             d["Gap"] = d["TQty"] - d["Qty"]
             cols += ["TQty", "TLME", "TValue", "Gap"]
-            names += ["Table Total (T)", "Table LME (€/kg)", "Table Value (€)", "Table − Consumed (T)"]
-            d_fmt.update({"Table Total (T)": "{:,.1f}", "Table LME (€/kg)": "{:.4f}",
-                          "Table Value (€)": "€{:,.0f}", "Table − Consumed (T)": "{:+,.1f}"})
+            names += [f"{tbl_name} (T)", f"{tbl_name} LME (€/kg)", f"{tbl_name} Value (€)", "Total − Consumed (T)"]
+            d_fmt.update({f"{tbl_name} (T)": "{:,.1f}", f"{tbl_name} LME (€/kg)": "{:.4f}",
+                          f"{tbl_name} Value (€)": "€{:,.0f}", "Total − Consumed (T)": "{:+,.1f}"})
         d = d.sort_values("Fixation")[cols]
         d.columns = names
         st.dataframe(
@@ -1153,13 +1153,13 @@ with tab_stock:
     render_flow_tab("📦", "Stock Analysis", "Opening stock carried over from the previous month, by fixation",
                     "Qty_Stock_T", "Stock_Value", "Qty Stock", NAVY_LT,
                     "No stock recorded for the current selection.", "stock",
-                    "Tbl_Stock_T", "Tbl_Stock_Value", "Stock table (by LME fixations)")
+                    "Tbl_Stock_T", "Tbl_Stock_Value", "Total Stock")
 
 with tab_purchase:
     render_flow_tab("🛒", "Purchase Consumed Analysis", "Purchases consumed during the month and their LME price, by fixation",
                     "Qty_Purchase_T", "Purchase_Value", "Qty Purchased", TEAL,
                     "No purchases consumed for the current selection.", "purchase",
-                    "Tbl_Purch_T", "Tbl_Purch_Value", "Consumed purchase table")
+                    "Tbl_Purch_T", "Tbl_Purch_Value", "Total Purchase")
 
 def _pc(a, b):
     return (a / b * 100) if b else 0.0
@@ -1220,17 +1220,17 @@ with tab_supply:
         cover_color = TEAL if coverage >= 100 else ROSE
 
         c1, c2, c3, c4 = st.columns(4)
-        kpi(c1, "📥", "Total Supply", f"{T_supply:,.0f} T", NAVY_LT, f"Stock + purchases (file tables) · €{fmt_compact(T_supply_val)}"
+        kpi(c1, "📥", "Total Supply", f"{T_supply:,.0f} T", NAVY_LT, f"Stock + purchases · €{fmt_compact(T_supply_val)}"
             if supply_from_tables else f"Stock + purchases · €{fmt_compact(T_supply_val)}")
         kpi(c2, "📤", "Total Sold", f"{T_sold2:,.0f} T", COPPER, f"€{fmt_compact(T_sales_val)}")
         kpi(c3, "🎯", "Coverage", f"{coverage:.0f}%", cover_color, "Supply vs sales, by tonnage")
         kpi(c4, "⚖️", "Net Gap", f"{gap:+,.0f} T", TEAL if gap >= 0 else ROSE,
             "Surplus left unsold" if gap >= 0 else "Covered by reallocation")
         if supply_from_tables:
-            st.caption(f"Supply = full totals of the file tables (Stock by LME fixations + Consumed purchase). "
+            st.caption(f"Supply = Total Stock + Total Purchase. "
                        f"Of which consumed in the FIFO balance: {T_fifo:,.0f} T.")
         else:
-            st.caption("File tables not found for this selection — supply shown as consumed in the FIFO balance.")
+            st.caption("Total Stock / Total Purchase not found for this selection — supply shown as consumed in the FIFO balance.")
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
         gv = g[(g["Supply_T"] > 0) | (g["Qty_Sold_T"] > 0) | (g["Fifo_T"] > 0)].reset_index(drop=True)
