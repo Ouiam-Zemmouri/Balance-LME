@@ -228,6 +228,7 @@ span[data-baseweb="tag"], div[data-baseweb="tag"],
 .coverage-card{
   background:linear-gradient(145deg,#f8f9fc 0%,#eef1f8 100%);
   border:1px solid #e9edf5;border-radius:14px;padding:18px 14px;text-align:center;
+  margin-bottom:32px;
 }
 .coverage-ring{position:relative;width:110px;height:110px;margin:0 auto;}
 .coverage-ring svg{transform:rotate(-90deg);}
@@ -790,6 +791,7 @@ n_tot       = int(len(grp_bal))
 # ── SIDEBAR: favorable periods (under Data Coverage) ──
 with st.sidebar:
     n_unfav = n_tot - n_fav
+    st.markdown('<div style="height:14px"></div>', unsafe_allow_html=True)
     st.markdown('<p class="filter-label">🥯 Favorable Periods</p>', unsafe_allow_html=True)
     if n_tot == 0:
         st.caption("No period in the current selection.")
