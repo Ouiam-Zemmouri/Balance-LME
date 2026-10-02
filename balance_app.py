@@ -1139,7 +1139,7 @@ def render_flow_tab(icon, title, sub, qty_col, val_col, qty_name, color, empty_m
 
 with tab_stock:
     render_flow_tab("📦", "Stock Analysis", "Opening stock carried over from the previous month, by fixation",
-                    "Qty_Stock_T", "Stock_Value", "Qty Stock", NAVY_LT,
+                    "Qty_Stock_T", "Stock_Value", "Qty Stock", TEAL,
                     "No stock recorded for the current selection.", "stock",
                     "Tbl_Stock_T", "Tbl_Stock_Value", "Total Stock")
 
