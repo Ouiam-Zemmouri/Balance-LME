@@ -1148,7 +1148,7 @@ with tab_purchase:
                     "Qty_Purchase_T", "Purchase_Value", "Qty Purchased", TEAL,
                     "No purchases consumed for the current selection.", "purchase",
                     "Tbl_Purch_T", "Tbl_Purch_Value", "Total Purchase",
-                    title_qty="Qty Purchase Consumed", title_tbl="Total Purchase Consumed")
+                    title_qty="Qty Purchase Consumed — FIFO method", title_tbl="Total Purchase Consumed")
 
 def _pc(a, b):
     return (a / b * 100) if b else 0.0
