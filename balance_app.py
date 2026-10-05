@@ -1017,7 +1017,7 @@ def combo_fixation_chart(agg, qty_name, bar_color, tbl_name=None):
     return fig
 
 def analysis_section(icon, title, sub, df, qty_col, val_col, qty_name, color, empty_msg,
-                     tbl_qty_col=None, tbl_val_col=None, tbl_name=None):
+                     tbl_qty_col=None, tbl_val_col=None, tbl_name=None, title_qty=None, title_tbl=None):
     with st.container(border=True):
         sec(icon, title, sub)
         q, v, p = wavg(df, qty_col, val_col)
@@ -1026,7 +1026,7 @@ def analysis_section(icon, title, sub, df, qty_col, val_col, qty_name, color, em
             st.info(empty_msg)
             return
         if tbl_qty_col:
-            st.markdown(f"**{qty_name} — consumed in the balance calculation**")
+            st.markdown(f"**{title_qty or (qty_name + ' — consumed in the balance calculation')}**")
         if q > 0:
             c1, c2, c3 = st.columns(3)
             kpi(c1, "📦", qty_name, f"{q:,.1f} T", color)
@@ -1036,7 +1036,7 @@ def analysis_section(icon, title, sub, df, qty_col, val_col, qty_name, color, em
             st.caption("Nothing consumed in the balance calculation for this selection.")
         if tbl_qty_col:
             st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-            st.markdown(f"**{tbl_name}**")
+            st.markdown(f"**{title_tbl or tbl_name}**")
             if tq > 0:
                 t1, t2, t3, t4 = st.columns(4)
                 kpi(t1, "📋", "Total Qty", f"{tq:,.1f} T", NAVY_MD)
@@ -1100,9 +1100,9 @@ def flow_evolution_chart(df, qty_col, val_col, qty_name, color, tbl_qty_col=None
     return fig
 
 def render_flow_tab(icon, title, sub, qty_col, val_col, qty_name, color, empty_msg, key,
-                    tbl_qty_col=None, tbl_val_col=None, tbl_name=None):
+                    tbl_qty_col=None, tbl_val_col=None, tbl_name=None, title_qty=None, title_tbl=None):
     analysis_section(icon, title, sub, view_fix, qty_col, val_col, qty_name, color, empty_msg,
-                     tbl_qty_col, tbl_val_col, tbl_name)
+                     tbl_qty_col, tbl_val_col, tbl_name, title_qty, title_tbl)
     if view_fix[qty_col].sum() <= 0 and (not tbl_qty_col or view_fix[tbl_qty_col].sum() <= 0):
         return
 
@@ -1147,7 +1147,8 @@ with tab_purchase:
     render_flow_tab("🛒", "Purchase Consumed Analysis", "Purchases consumed during the month and their LME price, by fixation",
                     "Qty_Purchase_T", "Purchase_Value", "Qty Purchased", TEAL,
                     "No purchases consumed for the current selection.", "purchase",
-                    "Tbl_Purch_T", "Tbl_Purch_Value", "Total Purchase")
+                    "Tbl_Purch_T", "Tbl_Purch_Value", "Total Purchase",
+                    title_qty="Qty Purchase Consumed", title_tbl="Total Purchase Consumed")
 
 def _pc(a, b):
     return (a / b * 100) if b else 0.0
@@ -1175,11 +1176,11 @@ def _stack_bar(parts, height=34, show_text=True):
 with tab_supply:
     sup = view_fix.copy()
     for c in ["Qty_Stock_T","Qty_Purchase_T","Qty_Sold_T","Stock_Value","Purchase_Value","Sales_Value",
-              "Tbl_Stock_T","Tbl_Stock_Value","Tbl_Purch_T","Tbl_Purch_Value"]:
+              "Allocated_QTE","Realloc_Value","Tbl_Stock_T","Tbl_Stock_Value","Tbl_Purch_T","Tbl_Purch_Value"]:
         sup[c] = pd.to_numeric(sup[c], errors="coerce").fillna(0)
-    # FIFO view: only what the balance calculation consumed
-    sup["Fifo_T"] = sup["Qty_Stock_T"] + sup["Qty_Purchase_T"]
-    sup["Fifo_Value"] = sup["Stock_Value"] + sup["Purchase_Value"]
+    # FIFO view: everything the balance calculation consumed = stock + purchases + reallocated quantity
+    sup["Fifo_T"] = sup["Qty_Stock_T"] + sup["Qty_Purchase_T"] + sup["Allocated_QTE"]
+    sup["Fifo_Value"] = sup["Stock_Value"] + sup["Purchase_Value"] + sup["Realloc_Value"]
     # Real view: full totals of the file tables (stock by LME fixations + consumed purchase)
     sup["Supply_T"] = sup["Tbl_Stock_T"] + sup["Tbl_Purch_T"]
     sup["Supply_Value"] = sup["Tbl_Stock_Value"] + sup["Tbl_Purch_Value"]
@@ -1216,7 +1217,7 @@ with tab_supply:
             "Surplus left unsold" if gap >= 0 else "Covered by reallocation")
         if supply_from_tables:
             st.caption(f"Supply = Total Stock + Total Purchase. "
-                       f"Of which consumed in the FIFO balance: {T_fifo:,.0f} T.")
+                       f"Of which consumed in the FIFO balance (stock + purchases + reallocated): {T_fifo:,.0f} T.")
         else:
             st.caption("Total Stock / Total Purchase not found for this selection — supply shown as consumed in the FIFO balance.")
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
@@ -1231,7 +1232,7 @@ with tab_supply:
                                     marker_color=NAVY_LT, opacity=0.85,
                                     hovertemplate="%{y:,.1f} T<extra></extra>"))
             if supply_from_tables:
-                figSV.add_trace(go.Bar(x=gv["Fixation"], y=gv["Fifo_T"], name="Of which consumed in FIFO",
+                figSV.add_trace(go.Bar(x=gv["Fixation"], y=gv["Fifo_T"], name="Of which consumed in FIFO (incl. reallocated)",
                                         marker_color=TEAL, opacity=0.85,
                                         hovertemplate="%{y:,.1f} T<extra></extra>"))
             figSV.add_trace(go.Bar(x=gv["Fixation"], y=gv["Qty_Sold_T"], name="Sold",
@@ -1248,7 +1249,7 @@ with tab_supply:
             figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Supply_LME"], name="Supply LME (€/kg)",
                                    marker_color=NAVY_LT, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
             if supply_from_tables:
-                figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Fifo_LME"], name="FIFO consumed LME (€/kg)",
+                figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Fifo_LME"], name="FIFO consumed LME (€/kg, incl. reallocated)",
                                        marker_color=TEAL, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
             figP.add_trace(go.Bar(x=gv["Fixation"], y=gv["Sales_LME"], name="Sales LME (€/kg)",
                                    marker_color=COPPER, hovertemplate="%{y:.4f} €/kg<extra></extra>"))
