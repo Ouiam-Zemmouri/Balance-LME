@@ -1269,16 +1269,7 @@ with tab_supply:
                                            opacity=0.9, text=labels, textposition="outside",
                                            cliponaxis=False, showlegend=False,
                                            hovertemplate="%{x}: %{text}<extra></extra>"))
-                    if gap_pre > 0.5:   # ghost bar = the gap that sales need on top of stock + purchases
-                        figRB.add_trace(go.Bar(x=["Stock +<br>Purchase"], y=[gap_pre], base=[S_c + P_c],
-                                               marker=dict(color="rgba(217,154,0,0.15)",
-                                                           line=dict(color=AMBER_RE, width=1.5),
-                                                           pattern=dict(shape="/", fgcolor=AMBER_RE)),
-                                               name="Gap to sales", showlegend=False,
-                                               text=[f"Gap {gap_pre:,.0f} T"], textposition="inside",
-                                               insidetextanchor="middle",
-                                               hovertemplate="Gap to sales: %{y:,.1f} T<extra></extra>"))
-                    alay(figRB, barmode="overlay", height=360, showlegend=False,
+                    alay(figRB, barmode="group", height=360, showlegend=False,
                          yaxis=dict(title="Quantity (T)", range=[0, max(heights) * 1.18]),
                          xaxis=dict(title=""))
                     st.plotly_chart(figRB, use_container_width=True, theme=None)
