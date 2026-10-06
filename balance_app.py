@@ -36,8 +36,11 @@ if not st.session_state.authenticated:
           <div style="font-size:1.2rem;font-weight:800;color:#16264a;">⚖️ Balance LME</div>
           <div style="font-size:0.8rem;color:#5b6478;margin-top:2px;">COFICAB Kenitra · COFICAB Maroc</div>
         </div>""", unsafe_allow_html=True)
-        password = st.text_input("Password", type="password")
-        if st.button("Login", use_container_width=True):
+        # st.form lets the Enter key submit the password (no need to click Login)
+        with st.form("login_form", border=False):
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Login", use_container_width=True)
+        if submitted:
             if password == PASSWORD:
                 st.session_state.authenticated = True
                 st.rerun()
