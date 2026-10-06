@@ -1243,6 +1243,63 @@ with tab_supply:
                  yaxis=dict(title="Quantity (T)"), xaxis=dict(title=""))
             st.plotly_chart(figSV, use_container_width=True, theme=None)
 
+        # ── Reallocation bridge: explains the gap between (stock + purchases consumed) and sales ──
+        S_c, P_c = sup["Qty_Stock_T"].sum(), sup["Qty_Purchase_T"].sum()
+        R_c, SOLD_c = sup["Allocated_QTE"].sum(), sup["Qty_Sold_T"].sum()
+        gap_pre = SOLD_c - (S_c + P_c)          # what sales need beyond own stock + purchases consumed
+        resid = gap_pre - R_c                   # what reallocation does not explain
+        AMBER_RE = "#D99A00"
+        if SOLD_c > 0:
+            with st.container(border=True):
+                sec("🔄", "Reallocation — Closing the Gap",
+                    "How stock + purchases consumed reach the tonnage sold")
+                if gap_pre <= 0.5 and R_c <= 0.5:
+                    st.success(f"Stock + purchases consumed ({S_c + P_c:,.0f} T) already cover sales "
+                               f"({SOLD_c:,.0f} T) — no reallocation needed.")
+                else:
+                    steps = ["Stock<br>consumed", "Purchase<br>consumed", "Stock +<br>Purchase",
+                             "Reallocated", "Covered<br>supply", "Sold"]
+                    heights = [S_c, P_c, S_c + P_c, R_c, S_c + P_c + R_c, SOLD_c]
+                    bases   = [0, S_c, 0, S_c + P_c, 0, 0]
+                    colors  = [TEAL, TEAL, NAVY_LT, AMBER_RE, NAVY_MD, COPPER]
+                    labels  = [f"{S_c:,.0f} T", f"+{P_c:,.0f} T", f"{S_c + P_c:,.0f} T",
+                               f"+{R_c:,.0f} T", f"{S_c + P_c + R_c:,.0f} T", f"{SOLD_c:,.0f} T"]
+                    figRB = go.Figure()
+                    figRB.add_trace(go.Bar(x=steps, y=heights, base=bases, marker_color=colors,
+                                           opacity=0.9, text=labels, textposition="outside",
+                                           cliponaxis=False, showlegend=False,
+                                           hovertemplate="%{x}: %{text}<extra></extra>"))
+                    if gap_pre > 0.5:   # ghost bar = the gap that sales need on top of stock + purchases
+                        figRB.add_trace(go.Bar(x=["Stock +<br>Purchase"], y=[gap_pre], base=[S_c + P_c],
+                                               marker=dict(color="rgba(217,154,0,0.15)",
+                                                           line=dict(color=AMBER_RE, width=1.5),
+                                                           pattern=dict(shape="/", fgcolor=AMBER_RE)),
+                                               name="Gap to sales", showlegend=False,
+                                               text=[f"Gap {gap_pre:,.0f} T"], textposition="inside",
+                                               insidetextanchor="middle",
+                                               hovertemplate="Gap to sales: %{y:,.1f} T<extra></extra>"))
+                    alay(figRB, barmode="overlay", height=360, showlegend=False,
+                         yaxis=dict(title="Quantity (T)", range=[0, max(heights) * 1.18]),
+                         xaxis=dict(title=""))
+                    st.plotly_chart(figRB, use_container_width=True, theme=None)
+
+                    k1, k2, k3 = st.columns(3)
+                    kpi(k1, "🧩", "Gap before reallocation", f"{gap_pre:+,.0f} T", ROSE if gap_pre > 0 else TEAL,
+                        "Sold − (stock + purchases consumed)")
+                    kpi(k2, "🔄", "Reallocated", f"{R_c:,.0f} T", AMBER_RE,
+                        f"Covers {_pc(R_c, gap_pre):.0f}% of the gap" if gap_pre > 0.5 else "Moved between fixations")
+                    kpi(k3, "✅", "Unexplained residual", f"{resid:+,.1f} T",
+                        TEAL if abs(resid) <= max(1.0, 0.005 * SOLD_c) else ROSE, "Rounding / timing")
+
+                    recv = sup.groupby("Fixation")["Allocated_QTE"].sum()
+                    recv = ", ".join(f"**{k}** (+{v:,.0f} T)" for k, v in recv.items() if v > 0.5)
+                    st.caption(
+                        f"**Why the gap?** Sales ({SOLD_c:,.0f} T) exceed stock + purchases consumed "
+                        f"({S_c + P_c:,.0f} T) by {gap_pre:,.0f} T. That shortfall is covered by "
+                        f"{R_c:,.0f} T reallocated from other fixations"
+                        + (f" — received by {recv}" if recv else "")
+                        + ". Without reallocation, the balance would not reconcile.")
+
         with st.container(border=True):
             sec("🔶", "Price: Supply Cost vs Sales Price", "Average LME €/kg — the wider the gap, the bigger the margin")
             figP = go.Figure()
