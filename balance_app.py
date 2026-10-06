@@ -1274,13 +1274,11 @@ with tab_supply:
                          xaxis=dict(title=""))
                     st.plotly_chart(figRB, use_container_width=True, theme=None)
 
-                    k1, k2, k3 = st.columns(3)
+                    k1, k2 = st.columns(2)
                     kpi(k1, "🧩", "Gap before reallocation", f"{gap_pre:+,.0f} T", ROSE if gap_pre > 0 else TEAL,
                         "Sold − (stock + purchases consumed)")
                     kpi(k2, "🔄", "Reallocated", f"{R_c:,.0f} T", AMBER_RE,
                         f"Covers {_pc(R_c, gap_pre):.0f}% of the gap" if gap_pre > 0.5 else "Moved between fixations")
-                    kpi(k3, "✅", "Unexplained residual", f"{resid:+,.1f} T",
-                        TEAL if abs(resid) <= max(1.0, 0.005 * SOLD_c) else ROSE, "Rounding / timing")
 
                     recv = sup.groupby("Fixation")["Allocated_QTE"].sum()
                     recv = ", ".join(f"**{k}** (+{v:,.0f} T)" for k, v in recv.items() if v > 0.5)
